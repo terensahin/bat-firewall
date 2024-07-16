@@ -9,49 +9,55 @@
 #include <fcntl.h>
 #include <time.h>
 #include <stdarg.h>
-#include "student_vector.h"
+#include <sys/socket.h>
+#include <errno.h>
+#include <sys/un.h>
+#include "c_dynamic_vector.h"
 
-static const char *LOG_FILE = "/home/baranbolo/Desktop/airties_staj/daemon_processes/daemon.log";
+static const char *LOG_FILE = "/home/terensahin/Documents/platform_i/daemon.log";
 
-static FILE *logfp;   
+#define SV_SOCK_PATH "/tmp/platform"
+#define BUF_SIZE 100
+#define BACKLOG 5
 
-void logMessage(const char *format, ...)
+static FILE *logfp;
+
+int logMessage(const char *format)
 {
-    fprintf(logfp, "%s\n", format); /* Writes to opened log file */
+    return fprintf(logfp, "%s", format); /* Writes to opened log file */
 }
 
 void logOpen(const char *logFilename)
 {
     mode_t m;
 
-    m = umask(077);  /* To recover old mask */
-    logfp = fopen(logFilename, "a");  /* File is opened with permissions 700 */
+    m = umask(077);                  /* To recover old mask */
+    logfp = fopen(logFilename, "a"); /* File is opened with permissions 700 */
     umask(m);
 
-    if (logfp == NULL)   /* If opening the log fails */
+    if (logfp == NULL) /* If opening the log fails */
         exit(EXIT_FAILURE);
 
-    setbuf(logfp, NULL);   /* Disable stdio buffering */
+    setbuf(logfp, NULL); /* Disable stdio buffering */
 
-    logMessage("Opened log file");
 }
 
 void logClose(void)
 {
-    logMessage("Closing log file");
-    fclose(logfp); 
+    fclose(logfp);
 }
 
 static void skeleton_daemon()
 {
-    pid_t pid;  /* Used pid_t for portability */
+    pid_t pid; /* Used pid_t for portability */
 
     pid = fork(); /* This fork is to leave from process group */
 
-    if (pid < 0)   /* fork error */
+    if (pid < 0) /* fork error */
         exit(EXIT_FAILURE);
 
-    if (pid > 0){   /* Parent exits */
+    if (pid > 0)
+    { /* Parent exits */
         exit(EXIT_SUCCESS);
     }
 
@@ -59,8 +65,8 @@ static void skeleton_daemon()
     if (setsid() < 0) /* Child process becomes leader of his own session */
         exit(EXIT_FAILURE);
 
-    struct sigaction sa;  /* Ignore SIGCHLD and SIGHUP signals */
-    sigemptyset(&sa.sa_mask); 
+    struct sigaction sa; /* Ignore SIGCHLD and SIGHUP signals */
+    sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = SIG_IGN;
     if (sigaction(SIGHUP, &sa, NULL) == -1)
@@ -68,32 +74,32 @@ static void skeleton_daemon()
     if (sigaction(SIGCHLD, &sa, NULL) == -1)
         exit(EXIT_FAILURE);
 
-    pid = fork();   /* This fork is to prevent access to the terminal */
+    pid = fork(); /* This fork is to prevent access to the terminal */
 
-    if (pid < 0)    /* fork error*/
+    if (pid < 0) /* fork error*/
         exit(EXIT_FAILURE);
 
-    if (pid > 0)    /* Parent exits */
+    if (pid > 0) /* Parent exits */
         exit(EXIT_SUCCESS);
 
     /* Grandchild continues */
 
-    umask(077);    /* Newly opened files will have permission 700
-                    so that only deamon process can rwe them */
+    umask(077); /* Newly opened files will have permission 700
+                 so that only deamon process can rwe them */
 
-    chdir("/");    /* Changing working directory to be able to unmount the initial directory */
+    chdir("/"); /* Changing working directory to be able to unmount the initial directory */
 
-    int maxfd = sysconf(_SC_OPEN_MAX);  /* Get maximum possible file desciptor a process can have */
-    if (maxfd == -1)    /* If not defined, make a guess */
-        maxfd = 8192;  
+    int maxfd = sysconf(_SC_OPEN_MAX); /* Get maximum possible file desciptor a process can have */
+    if (maxfd == -1)                   /* If not defined, make a guess */
+        maxfd = 8192;
 
-    for (int i = maxfd - 1; i>=0; i--)   /* Closed all desciptors */
+    for (int i = maxfd - 1; i >= 0; i--) /* Closed all desciptors */
     {
         close(i);
     }
 
-    int fd = open("/dev/null", O_RDWR);  /* 0,1,2 file desciptors are pointed to null, so functions using stdin or stdout does not generate error */
-    if (fd != STDIN_FILENO)         /* 'fd' should be 0 */
+    int fd = open("/dev/null", O_RDWR); /* 0,1,2 file desciptors are pointed to null, so functions using stdin or stdout does not generate error */
+    if (fd != STDIN_FILENO)             /* 'fd' should be 0 */
         exit(EXIT_FAILURE);
     if (dup2(STDIN_FILENO, STDOUT_FILENO) != STDOUT_FILENO)
         exit(EXIT_FAILURE);
@@ -101,30 +107,91 @@ static void skeleton_daemon()
         exit(EXIT_FAILURE);
 }
 
-int main(int argc, char* argv[])
+int create_socket()
 {
-    for(int i = 0; i < argc; i++){  /* If -t command line argument is given, the vector is tested */
-        printf("%s", argv[i]);
-        if(strcmp(argv[i], "-t") == 0){
-            printf(" activates test mode\n");
-            test_vector(); /* student_vector.c */
-        }
-        else{
-            printf("\n");
-        }
+    struct sockaddr_un socket_address;
+    int socket_fd;
+
+    socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    if (socket_fd == -1)
+    {
+        perror("Error creating socket!");
+        exit(EXIT_FAILURE);
     }
 
+    if (strlen(SV_SOCK_PATH) > sizeof(socket_address.sun_path) - 1)
+        exit(EXIT_FAILURE);
+
+    if (remove(SV_SOCK_PATH) == -1 && errno != ENOENT)
+        exit(EXIT_FAILURE);
+
+    memset(&socket_address, 0, sizeof(struct sockaddr_un)); /* Cleared the socket_address */
+    socket_address.sun_family = AF_UNIX;                    /* UNIX domain address */
+    strncpy(socket_address.sun_path, SV_SOCK_PATH, sizeof(socket_address.sun_path) - 1);
+
+    if (bind(socket_fd, (struct sockaddr *)&socket_address, sizeof(struct sockaddr_un)) == -1)
+    {
+        if (errno == EADDRINUSE)
+        {
+            perror("socket in use");
+            exit(EXIT_FAILURE);
+        }
+        perror("binding error ");
+
+        exit(EXIT_FAILURE);
+    }
+
+    if (listen(socket_fd, BACKLOG) == -1)
+        exit(EXIT_FAILURE);
+
+    return socket_fd;
+}
+
+
+int main(int argc, char *argv[])
+{
     skeleton_daemon();
 
-    int i = 0;
+    int socket_fd = create_socket();
+
+    int connection_fd;
+    ssize_t numRead;
+    char buf[BUF_SIZE];
+
+    int message_count = 0;
     while (1)
     {
+        memset(buf, 0, sizeof(buf));
+        connection_fd = accept(socket_fd, NULL, NULL);
+        if (connection_fd == -1)
+            exit(EXIT_FAILURE);
+
+        while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0)
+        {
+            logOpen(LOG_FILE);
+            int numWrite = logMessage(buf);
+            logClose();
+
+
+            if(numRead != numWrite) exit(EXIT_FAILURE);
+
+            message_count++;
+            memset(buf, 0, sizeof(buf));
+        }
+
         logOpen(LOG_FILE);
-        logMessage("BURDAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA");
         logClose();
-        sleep (5);
-        i++;
-        if(i >= 5) break;
+        
+
+        if (numRead == -1){
+            perror("read");
+            exit(EXIT_FAILURE);
+        }
+        if (close(connection_fd) == -1)
+            perror("close");
+            exit(EXIT_FAILURE);
+        if (message_count >= 5)
+            exit(EXIT_SUCCESS);
     }
     return EXIT_SUCCESS;
 }
