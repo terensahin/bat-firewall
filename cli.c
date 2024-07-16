@@ -9,12 +9,53 @@
 #define BUF_SIZE 100
 #define SV_SOCK_PATH "/tmp/platform"
 
+
+void usage(){
+    printf("boyle kullanilacak\n");
+}
+
 int main(int argc, char *argv[])
 {
+
+    if(argc < 2) usage();
+
+
+    int is_command_received = 0;
+    char buf[BUF_SIZE];
+    char commandbuf[BUF_SIZE];
+    int index = 0;
+
+ 
+    for (int i = 1; i < argc; i++){
+
+        if(strcmp(argv[i], "--help") == 0){
+            // TODO fill
+            return 0;
+        }  
+        /* If -t command line argument is given, the vector is tested */
+        if ((strcmp(argv[i], "-a") == 0) || (strcmp(argv[i], "-d") == 0) || (strcmp(argv[i], "-s") == 0)){
+            if(is_command_received){
+                printf("More than one commands are not allowed\n");
+                return 1;
+            }
+            is_command_received = 1;
+            snprintf(buf + index, sizeof(argv[i])+1, "%s,", argv[i]); 
+            index += strlen(argv[i]) + 1;
+        }
+        else{
+            snprintf(buf + index, sizeof(argv[i])+1, "%s,", argv[i]);
+            index += strlen(argv[i]) + 1; 
+        }
+    }
+
+    buf[index] = '\0';
+    printf("%s\n", buf);
+    fflush(stdout);
+
+
     struct sockaddr_un addr;
     int sfd;
     ssize_t numRead;
-    char buf[BUF_SIZE];
 
     /* Create client socket */
     sfd = socket(AF_UNIX, SOCK_STREAM, 0);
@@ -40,14 +81,13 @@ int main(int argc, char *argv[])
     }
 
     /* Copy stdin to socket */
-    while ((numRead = read(STDIN_FILENO, buf, BUF_SIZE)) > 0)
-    {
-        int numWrite = write(sfd, buf, numRead);
-        if (numWrite != numRead)
-            exit(EXIT_FAILURE);
+    // while ((numRead = read(STDIN_FILENO, buf, BUF_SIZE)) > 0)
+    // {
+        int numWrite = write(sfd, buf, strlen(buf));
+        // if (numWrite != numRead) exit(EXIT_FAILURE);
         // if (numWrite != 0)
         //     break;
-    }
+    // }
 
     if (numRead == -1)
     {

@@ -163,8 +163,15 @@ int main(int argc, char *argv[])
     {
         memset(buf, 0, sizeof(buf));
         connection_fd = accept(socket_fd, NULL, NULL);
-        if (connection_fd == -1)
+        if (connection_fd == -1){
+                logOpen(LOG_FILE);
+                char str[20];
+                snprintf(str, 20, "%d-%d", 1,1);
+                logMessage(str);
+                logClose();
             exit(EXIT_FAILURE);
+        }
+
 
         while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0)
         {
@@ -173,25 +180,37 @@ int main(int argc, char *argv[])
             logClose();
 
 
-            if(numRead != numWrite) exit(EXIT_FAILURE);
-
+            if(numRead != numWrite){
+                logOpen(LOG_FILE);
+                char str[20];
+                snprintf(str, 20, "%d-%d", numWrite, numRead);
+                logMessage(str);
+                logClose();
+                exit(EXIT_FAILURE);
+            }
             message_count++;
             memset(buf, 0, sizeof(buf));
         }
 
         logOpen(LOG_FILE);
+        char str[20];
+        snprintf(str, 20, "%d", numRead);
+        logMessage(str);
         logClose();
+
+        
         
 
         if (numRead == -1){
             perror("read");
             exit(EXIT_FAILURE);
         }
-        if (close(connection_fd) == -1)
+        if (close(connection_fd) == -1){
             perror("close");
             exit(EXIT_FAILURE);
-        if (message_count >= 5)
-            exit(EXIT_SUCCESS);
+        }
+
+        if (message_count >= 5) exit(EXIT_SUCCESS);
     }
     return EXIT_SUCCESS;
 }
