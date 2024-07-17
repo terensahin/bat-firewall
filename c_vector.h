@@ -1,6 +1,6 @@
 
-#ifndef C_DYNAMIC_VECTOR_H
-#define C_DYNAMIC_VECTOR_H
+#ifndef C_VECTOR_H
+#define C_VECTOR_H
 
 #include <stdio.h>
 #include <string.h>
@@ -30,5 +30,7 @@ void* vector_push_back(void *vec, void *element_ptr);
 void vector_erase(void *vec, int index);
 void vector_pop_back(void *vec);
 void* vector_at(void *vec, int index);
+void* vector_front(void *vec);
+void* vector_back(void *vec);
 void vector_free(void *vec);
 #endif

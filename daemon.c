@@ -12,14 +12,14 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/un.h>
-#include "c_dynamic_vector.h"
+#include "c_vector.h"
 
 static const char *LOG_FILE = "/home/ahmet/Desktop/daemon.log";
+static const char *ERR_FILE = "home/ahmet/Desktop/error.log";
 
 #define SV_SOCK_PATH "/tmp/platform"
 #define BUF_SIZE 100
 #define BACKLOG 5
-static const char *ERR_FILE = "home/ahmet/Desktop/error.log";
 static FILE *logfp;
 
 ssize_t logMessage(const char *format)
@@ -168,37 +168,36 @@ int main(int argc, char *argv[])
         memset(buf, 0, sizeof(buf));
         connection_fd = accept(socket_fd, NULL, NULL);
         if (connection_fd == -1){
-                logOpen(LOG_FILE);
-                char str[20];
-                snprintf(str, 20, "%d-%d", 1,1);
-                logMessage(str);
-                logClose();
+            logOpen(LOG_FILE);
+            char str[20];
+            snprintf(str, 20, "%d-%d", 1,1);
+            logMessage(str);
+            logClose();
             exit(EXIT_FAILURE);
         }
 
 
-        while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0)
-        {
+        while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0){
             logOpen(LOG_FILE);
             numWrite = logMessage(buf);
             logClose();
 	    
-	    /* get the first token */
-  	    token = strtok(buf, ",");
-   		
-	    if(strcmp(token, "-a") == 0){
-		token = strtok(NULL, ",");
-		int number = atoi(token);
-	        vector = vector_push_back(vector, &number);
-	    }
+            /* get the first token */
+            token = strtok(buf, ",");
+            
+            if(strcmp(token, "-a") == 0){
+            token = strtok(NULL, ",");
+            int number = atoi(token);
+                vector = vector_push_back(vector, &number);
+            }
 	    
-		logOpen(LOG_FILE);
-                char str[20];
-		int *ptr = vector_at(vector, 0);
+            logOpen(LOG_FILE);
+            char str[20];
+            int *ptr = vector_at(vector, 0);
 
-                snprintf(str, 20, "%d\n", *ptr);
-                logMessage(str);
-                logClose();
+            snprintf(str, 20, "%d\n", *ptr);
+            logMessage(str);
+            logClose();
 
             if(numRead != numWrite){
                 logOpen(LOG_FILE);
@@ -211,15 +210,6 @@ int main(int argc, char *argv[])
             message_count++;
             memset(buf, 0, sizeof(buf));
         }
-
-        logOpen(LOG_FILE);
-        char str[20];
-        snprintf(str, 20, "%ld\n", numRead);
-        logMessage(str);
-        logClose();
-
-        
-        
 
         if (numRead == -1){
             perror("read");
