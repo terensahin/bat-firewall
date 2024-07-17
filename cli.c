@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
             write_index += strlen(argv[i]) + 1; 
         }
     }
-    buf[write_index] = '\0';
+    buf[--write_index] = '\0';
 
     struct sockaddr_un addr;
     int sfd;
@@ -105,6 +105,19 @@ int main(int argc, char *argv[])
         perror("error writing");
         exit(EXIT_FAILURE);
     }
+
+    if(read(sfd, buf, BUF_SIZE) == -1){
+        perror("read");
+        exit(EXIT_FAILURE);
+    }
+
+    printf("%s", buf);
+
+    if(close(sfd) == -1){
+        perror("close");
+        exit(EXIT_FAILURE);
+    }
+
     /* Closes our socket; server sees EOF */
     exit(EXIT_SUCCESS);
 }

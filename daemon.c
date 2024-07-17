@@ -20,6 +20,8 @@ static const char *ERR_FILE = "home/terensahin/Documents/platform_i/error.log";
 #define SV_SOCK_PATH "/tmp/platform"
 #define BUF_SIZE 100
 #define BACKLOG 5
+#define MAXIMUM_MESSAGE_COUNT 10
+
 static FILE *logfp;
 
 ssize_t logMessage(const char *format)
@@ -159,6 +161,7 @@ int main(int argc, char *argv[])
     int connection_fd;
     ssize_t numRead, numWrite;
     char buf[BUF_SIZE];
+    char output_buf[BUF_SIZE];
     char *token;
     int *vector;
     vector = vector_initialize(vector, sizeof(int), NULL);
@@ -187,28 +190,40 @@ int main(int argc, char *argv[])
             if(strcmp(token, "-a") == 0){
                 token = strtok(NULL, ",");
                 int number = atoi(token);
+                snprintf(output_buf, BUF_SIZE, "Succesfully added %d\n", number);
                 vector = vector_push_back(vector, &number);                                
             }
 
             else if(strcmp(token, "-d") == 0){
                 int number = atoi(strtok(NULL, ","));
-                for(int i = 0; i < vector_get_size(vector); i++){
+                int i;
+                int is_deleted = 0;
+                for(i = vector_get_size(vector) - 1; i >= 0 ; i--){
                     if(*((int *)vector_at(vector, i)) == number){
                         vector_erase(vector, i);
+                        snprintf(output_buf, BUF_SIZE, "Deleted all elements equal to %d\n", number);
+                        is_deleted = 1;
                     }
                 }
+                if(!is_deleted) 
+                    snprintf(output_buf, BUF_SIZE, "There is no element equal to %d\n", number);
+               
             }
 
             else if(strcmp(token, "-s") == 0){
                 char buf[16];
+                strcpy(output_buf, "Vector: ");
                 for(int i = 0; i < vector_get_size(vector); i++){
-                    if(i == vector_get_size(vector) - 1) snprintf(buf, sizeof(int)+1, "%d", *((int *)vector_at(vector, i)));
+                    if(i == vector_get_size(vector) - 1)
+                        snprintf(buf, sizeof(int)+1, "%d", *((int *)vector_at(vector, i)));
+                    else
+                        snprintf(buf, sizeof(int)+1, "%d,", *((int *)vector_at(vector, i)));
 
-                    snprintf(buf, sizeof(int)+1, "%d,", *((int *)vector_at(vector, i)));
                     logMessage(buf);
+                    strcat(output_buf, buf);
                 }
+                strcat(output_buf, "\n");
             }
-
 
             if(numRead != numWrite){
                 logOpen(LOG_FILE);
@@ -217,24 +232,34 @@ int main(int argc, char *argv[])
                 logMessage(str);
                 logClose();
                 exit(EXIT_FAILURE);
-            }
+            }            
 
             logMessage("\n");
             logClose();
             message_count++;
             memset(buf, 0, sizeof(buf));
+
+
+            if(write(connection_fd, output_buf, BUF_SIZE) == -1){
+                perror("write");
+                exit(EXIT_FAILURE);
+            }
+
+
         }
+
 
         if (numRead == -1){
             perror("read");
             exit(EXIT_FAILURE);
         }
+
         if (close(connection_fd) == -1){
             perror("close");
             exit(EXIT_FAILURE);
         }
 
-        if (message_count >= 5) exit(EXIT_SUCCESS);
+        if (message_count >= MAXIMUM_MESSAGE_COUNT) exit(EXIT_SUCCESS);
     }
     return EXIT_SUCCESS;
 }

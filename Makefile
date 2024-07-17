@@ -11,4 +11,4 @@ c_dynamic_vector.o: c_vector.c c_vector.h
 	$(cc) -c c_vector.c c_vector.h
     
 clean:
-	rm -r airdaemon daemon.o c_vector.o c_vector.h.gch daemon.log cli
+	rm -rf airdaemon daemon.o c_vector.o c_vector.h.gch daemon.log cli
