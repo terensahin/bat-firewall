@@ -14,8 +14,9 @@
 #include <sys/un.h>
 #include "c_vector.h"
 
-static const char *LOG_FILE = "/home/terensahin/Documents/platform_i/daemon.log";
-static const char *ERR_FILE = "home/terensahin/Documents/platform_i/error.log";
+static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
+static const char *ERR_FILE = "home/baranbolo/Desktop/platform_i/error.log";
+static const char *BACKUP_FILE = "home/baranbolo/Desktop/platform_i/backup.log";
 
 #define SV_SOCK_PATH "/tmp/platform"
 #define BUF_SIZE 100
@@ -23,6 +24,8 @@ static const char *ERR_FILE = "home/terensahin/Documents/platform_i/error.log";
 #define MAXIMUM_MESSAGE_COUNT 10
 
 static FILE *logfp;
+
+int *vector;
 
 ssize_t logMessage(const char *format)
 {
@@ -49,6 +52,19 @@ void logClose(void)
     fclose(logfp);
 }
 
+void backup(){
+    logOpen(BACKUP_FILE);
+    char buf[16];
+    for(int i = 0; i < vector_get_size(vector); i++){
+        if(i == vector_get_size(vector) - 1)
+            snprintf(buf, sizeof(int)+1, "%d", *((int *)vector_at(vector, i)));
+        else
+            snprintf(buf, sizeof(int)+1, "%d,", *((int *)vector_at(vector, i)));
+        logMessage(buf);
+    }
+    logClose()
+}
+
 static void skeleton_daemon()
 {
     pid_t pid; /* Used pid_t for portability */
@@ -71,10 +87,22 @@ static void skeleton_daemon()
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = SIG_IGN;
-    if (sigaction(SIGHUP, &sa, NULL) == -1)
+    if (sigaction(SIGHUP, &sa, NULL) == -1) {
+        perror("sigaction");
         exit(EXIT_FAILURE);
-    if (sigaction(SIGCHLD, &sa, NULL) == -1)
+    }
+    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
+        perror("sigaction");
         exit(EXIT_FAILURE);
+    }
+
+    sigemptyset(&sa.sa_mask); /* Set handler for SIGTERM signal (backup on shutdown) */
+    sa.sa_flags = SA_RESTART;
+    sa.sa_handler = backup;
+    if (sigaction(SIGTERM, &sa, NULL) == -1) {
+        perror("sigaction");
+        exit(EXIT_FAILURE);
+    }
 
     pid = fork(); /* This fork is to prevent access to the terminal */
 
@@ -163,7 +191,7 @@ int main(int argc, char *argv[])
     char buf[BUF_SIZE];
     char output_buf[BUF_SIZE];
     char *token;
-    int *vector;
+
     vector = vector_initialize(vector, sizeof(int), NULL);
     int message_count = 0;
     while (1)
@@ -179,7 +207,6 @@ int main(int argc, char *argv[])
             exit(EXIT_FAILURE);
         }
 
-
         while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0){
             logOpen(LOG_FILE);
             numWrite = logMessage(buf);
@@ -187,7 +214,7 @@ int main(int argc, char *argv[])
             /* get the first token */
             token = strtok(buf, ",");
             
-            if(strcmp(token, "-a") == 0){
+            if (strcmp(token, "-a") == 0){
                 token = strtok(NULL, ",");
                 int number = atoi(token);
                 snprintf(output_buf, BUF_SIZE, "Succesfully added %d\n", number);
@@ -198,16 +225,15 @@ int main(int argc, char *argv[])
                 int number = atoi(strtok(NULL, ","));
                 int i;
                 int is_deleted = 0;
-                for(i = vector_get_size(vector) - 1; i >= 0 ; i--){
-                    if(*((int *)vector_at(vector, i)) == number){
+                for (i = vector_get_size(vector) - 1; i >= 0 ; i--){
+                    if (*((int *)vector_at(vector, i)) == number){
                         vector_erase(vector, i);
-                        snprintf(output_buf, BUF_SIZE, "Deleted all elements equal to %d\n", number);
+                        snprintf(output_buf, BUF_SIZE, "Succesfully deleted all elements equal to %d\n", number);
                         is_deleted = 1;
                     }
                 }
-                if(!is_deleted) 
+                if (!is_deleted) 
                     snprintf(output_buf, BUF_SIZE, "There is no element equal to %d\n", number);
-               
             }
 
             else if(strcmp(token, "-s") == 0){
@@ -225,7 +251,7 @@ int main(int argc, char *argv[])
                 strcat(output_buf, "\n");
             }
 
-            if(numRead != numWrite){
+            if (numRead != numWrite){
                 logOpen(LOG_FILE);
                 char str[20];
                 snprintf(str, 20, "%ld-%ld\n", numWrite, numRead);
@@ -239,15 +265,11 @@ int main(int argc, char *argv[])
             message_count++;
             memset(buf, 0, sizeof(buf));
 
-
-            if(write(connection_fd, output_buf, BUF_SIZE) == -1){
+            if (write(connection_fd, output_buf, BUF_SIZE) == -1){
                 perror("write");
                 exit(EXIT_FAILURE);
             }
-
-
         }
-
 
         if (numRead == -1){
             perror("read");

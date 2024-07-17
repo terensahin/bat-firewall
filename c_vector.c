@@ -150,11 +150,11 @@ void vector_free(void *vec)
 {
     if (vec)
     {
-        for (int i = 0; i < vector_get_size(vec); i++)
-        {
-            int *free_address = vec + i * vector_get_element_size(vec);
-            if(vector_get_metadata(vec)->elem_destructor_func != NULL)
+        if (vector_get_metadata(vec)->elem_destructor_func != NULL){
+            for (int i = 0; i < vector_get_size(vec); i++){
+                int *free_address = vec + i * vector_get_element_size(vec);
                 vector_get_metadata(vec)->elem_destructor_func(free_address);
+            }
         }
         free(vector_get_metadata(vec));
     }
