@@ -14,7 +14,7 @@
 #include <sys/un.h>
 #include "c_dynamic_vector.h"
 
-static const char *LOG_FILE = "/home/terensahin/Documents/platform_i/daemon.log";
+static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
 
 #define SV_SOCK_PATH "/tmp/platform"
 #define BUF_SIZE 100
@@ -22,7 +22,7 @@ static const char *LOG_FILE = "/home/terensahin/Documents/platform_i/daemon.log"
 
 static FILE *logfp;
 
-int logMessage(const char *format)
+ssize_t logMessage(const char *format)
 {
     return fprintf(logfp, "%s", format); /* Writes to opened log file */
 }
@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
     int socket_fd = create_socket();
 
     int connection_fd;
-    ssize_t numRead;
+    ssize_t numRead, numWrite;
     char buf[BUF_SIZE];
 
     int message_count = 0;
@@ -176,14 +176,14 @@ int main(int argc, char *argv[])
         while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0)
         {
             logOpen(LOG_FILE);
-            int numWrite = logMessage(buf);
+            numWrite = logMessage(buf);
             logClose();
 
 
             if(numRead != numWrite){
                 logOpen(LOG_FILE);
                 char str[20];
-                snprintf(str, 20, "%d-%d", numWrite, numRead);
+                snprintf(str, 20, "%ld-%ld\n", numWrite, numRead);
                 logMessage(str);
                 logClose();
                 exit(EXIT_FAILURE);
@@ -194,7 +194,7 @@ int main(int argc, char *argv[])
 
         logOpen(LOG_FILE);
         char str[20];
-        snprintf(str, 20, "%d", numRead);
+        snprintf(str, 20, "%ld\n", numRead);
         logMessage(str);
         logClose();
 
