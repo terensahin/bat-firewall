@@ -16,7 +16,15 @@ void shift_buffer(char* buf, int buf_size, int start_index, int shift_amount){
 }
 
 void help_usage(){
-    printf("boyle kullanilacak\n");
+    printf("Usage: cli [OPTIONS] [ARGUMENTS]\n");
+    printf("OPTIONS:\n");
+    printf("\t-a: Add\n");
+    printf("\t-d: Delete\n");
+    printf("\t-s: Search\n");
+    printf("ARGUMENTS:\n");
+    printf("\t[ARGUMENTS]: Arguments to be sent to the server\n");
+    printf("\tExample: cli -a 3\n");
+    exit(0);
 }
 
 int main(int argc, char *argv[])
@@ -61,7 +69,6 @@ int main(int argc, char *argv[])
             snprintf(buf + write_index, sizeof(argv[i])+1, "%s,", argv[i]);
             write_index += strlen(argv[i]) + 1; 
         }
-        printf("for: %s\n", buf);
     }
     buf[write_index] = '\0';
 

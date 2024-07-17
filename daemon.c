@@ -14,8 +14,8 @@
 #include <sys/un.h>
 #include "c_vector.h"
 
-static const char *LOG_FILE = "/home/ahmet/Desktop/daemon.log";
-static const char *ERR_FILE = "home/ahmet/Desktop/error.log";
+static const char *LOG_FILE = "/home/terensahin/Documents/platform_i/daemon.log";
+static const char *ERR_FILE = "home/terensahin/Documents/platform_i/error.log";
 
 #define SV_SOCK_PATH "/tmp/platform"
 #define BUF_SIZE 100
@@ -180,24 +180,35 @@ int main(int argc, char *argv[])
         while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0){
             logOpen(LOG_FILE);
             numWrite = logMessage(buf);
-            logClose();
 	    
             /* get the first token */
             token = strtok(buf, ",");
             
             if(strcmp(token, "-a") == 0){
-            token = strtok(NULL, ",");
-            int number = atoi(token);
-                vector = vector_push_back(vector, &number);
+                token = strtok(NULL, ",");
+                int number = atoi(token);
+                vector = vector_push_back(vector, &number);                                
             }
-	    
-            logOpen(LOG_FILE);
-            char str[20];
-            int *ptr = vector_at(vector, 0);
 
-            snprintf(str, 20, "%d\n", *ptr);
-            logMessage(str);
-            logClose();
+            else if(strcmp(token, "-d") == 0){
+                int number = atoi(strtok(NULL, ","));
+                for(int i = 0; i < vector_get_size(vector); i++){
+                    if(*((int *)vector_at(vector, i)) == number){
+                        vector_erase(vector, i);
+                    }
+                }
+            }
+
+            else if(strcmp(token, "-s") == 0){
+                char buf[16];
+                for(int i = 0; i < vector_get_size(vector); i++){
+                    if(i == vector_get_size(vector) - 1) snprintf(buf, sizeof(int)+1, "%d", *((int *)vector_at(vector, i)));
+
+                    snprintf(buf, sizeof(int)+1, "%d,", *((int *)vector_at(vector, i)));
+                    logMessage(buf);
+                }
+            }
+
 
             if(numRead != numWrite){
                 logOpen(LOG_FILE);
@@ -207,6 +218,9 @@ int main(int argc, char *argv[])
                 logClose();
                 exit(EXIT_FAILURE);
             }
+
+            logMessage("\n");
+            logClose();
             message_count++;
             memset(buf, 0, sizeof(buf));
         }
