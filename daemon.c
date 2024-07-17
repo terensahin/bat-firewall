@@ -14,9 +14,9 @@
 #include <sys/un.h>
 #include "c_vector.h"
 
-static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
-static const char *ERR_FILE = "home/baranbolo/Desktop/platform_i/error.log";
-static const char *BACKUP_FILE = "home/baranbolo/Desktop/platform_i/backup.log";
+static const char *LOG_FILE = "/home/terensahin/Documents/platform_i/daemon.log";
+static const char *ERR_FILE = "home/terensahin/Documents/platform_i/error.log";
+static const char *BACKUP_FILE = "home/terensahin/Documents/platform_i/backup.log";
 
 #define SV_SOCK_PATH "/tmp/platform"
 #define BUF_SIZE 100
@@ -32,12 +32,12 @@ ssize_t logMessage(const char *format)
     return fprintf(logfp, "%s", format); /* Writes to opened log file */
 }
 
-void logOpen(const char *logFilename)
+void logOpen(const char *logFilename, char* open_mode)
 {
     mode_t m;
 
     m = umask(077);                  /* To recover old mask */
-    logfp = fopen(logFilename, "a"); /* File is opened with permissions 700 */
+    logfp = fopen(logFilename, open_mode); /* File is opened with permissions 700 */
     umask(m);
 
     if (logfp == NULL) /* If opening the log fails */
@@ -52,7 +52,7 @@ void logClose(void)
 }
 
 void backup_shutdown(){
-    logOpen(BACKUP_FILE);
+    logOpen(BACKUP_FILE, "w");
     char buf[16];
     for(int i = 0; i < vector_get_size(vector); i++){
         if(i == vector_get_size(vector) - 1)
@@ -65,7 +65,7 @@ void backup_shutdown(){
 }
 
 void backup_start(){
-    logOpen(LOG_FILE);
+    logOpen(LOG_FILE, "a");
     FILE *file = fopen(BACKUP_FILE, "a+");
     if (file == NULL) {
         return;
@@ -228,7 +228,7 @@ int main(int argc, char *argv[])
         memset(buf, 0, sizeof(buf));
         connection_fd = accept(socket_fd, NULL, NULL);
         if (connection_fd == -1){
-            logOpen(LOG_FILE);
+            logOpen(LOG_FILE, "a");
             char str[20];
             snprintf(str, 20, "%d-%d", 1,1);
             logMessage(str);
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
         }
 
         while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0){
-            logOpen(LOG_FILE);
+            logOpen(LOG_FILE, "a");
             numWrite = logMessage(buf);
 	    
             /* get the first token */
@@ -287,7 +287,7 @@ int main(int argc, char *argv[])
             }
 
             if (numRead != numWrite){
-                logOpen(LOG_FILE);
+                logOpen(LOG_FILE, "a");
                 char str[20];
                 snprintf(str, 20, "%ld-%ld\n", numWrite, numRead);
                 logMessage(str);
