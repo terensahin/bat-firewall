@@ -13,12 +13,13 @@
 #include <errno.h>
 #include <sys/un.h>
 #include "c_vector.h"
+#include "common.h"
 
-static const char *LOG_FILE = "/home/terensahin/Documents/platform_i/daemon.log";
-static const char *ERR_FILE = "home/terensahin/Documents/platform_i/error.log";
-static const char *BACKUP_FILE = "home/terensahin/Documents/platform_i/backup.log";
+static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
+static const char *ERR_FILE = "home/baranbolo/Desktop/platform_i/error.log";
+static const char *BACKUP_FILE = "home/baranbolo/Desktop/platform_i/backup.log";
 
-#define SV_SOCK_PATH "/tmp/platform"
+#define SV_SOCK_PATH "/tmp/ud_ucase"
 #define BUF_SIZE 100
 #define BACKLOG 5
 #define MAXIMUM_MESSAGE_COUNT 10
@@ -65,6 +66,8 @@ void backup_shutdown(){
 }
 
 void backup_start(){
+    vector = vector_initialize(vector, sizeof(int), NULL);
+
     logOpen(LOG_FILE, "a");
     FILE *file = fopen(BACKUP_FILE, "a+");
     if (file == NULL) {
@@ -170,7 +173,7 @@ int create_socket()
     struct sockaddr_un socket_address;
     int socket_fd;
 
-    socket_fd = socket(AF_UNIX, SOCK_STREAM, 0);
+    socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (socket_fd == -1)
     {
         perror("Error creating socket!");
@@ -199,127 +202,39 @@ int create_socket()
         exit(EXIT_FAILURE);
     }
 
-    if (listen(socket_fd, BACKLOG) == -1)
-        exit(EXIT_FAILURE);
+    // change
+    // if (listen(socket_fd, BACKLOG) == -1)
+    //     exit(EXIT_FAILURE);
 
     return socket_fd;
 }
 
-
 int main(int argc, char *argv[])
 {
     skeleton_daemon();
-    vector = vector_initialize(vector, sizeof(int), NULL);
+
     backup_start();
-    // int error_int = open(ERR_FILE, O_APPEND | O_CREAT);
-    // dup2(error_int, 2);
-    // close(error_int);
+
     int socket_fd = create_socket();
  
-    int connection_fd;
-    ssize_t numRead, numWrite;
-    char buf[BUF_SIZE];
-    char output_buf[BUF_SIZE];
-    char *token;
-
-    int message_count = 0;
-    while (1)
-    {
-        memset(buf, 0, sizeof(buf));
-        connection_fd = accept(socket_fd, NULL, NULL);
-        if (connection_fd == -1){
-            logOpen(LOG_FILE, "a");
-            char str[20];
-            snprintf(str, 20, "%d-%d", 1,1);
-            logMessage(str);
-            logClose();
+    struct sockaddr_un claddr;
+    socklen_t len;
+    ssize_t read_bytes;
+    daemon_command command;
+    logOpen(LOG_FILE, "a");
+    while (1) {
+        read_bytes = recvfrom(socket_fd, &command, sizeof(daemon_command) * 2, 0,
+                            (struct sockaddr_un *) &claddr, &len);
+        if (read_bytes == -1){
             exit(EXIT_FAILURE);
         }
 
-        while ((numRead = read(connection_fd, buf, BUF_SIZE)) > 0){
-            logOpen(LOG_FILE, "a");
-            numWrite = logMessage(buf);
-	    
-            /* get the first token */
-            token = strtok(buf, ",");
-            int terminate = 0;
-            if (strcmp(token, "-a") == 0){
-                token = strtok(NULL, ",");
-                int number = atoi(token);
-                snprintf(output_buf, BUF_SIZE, "Succesfully added %d\n", number);
-                vector = vector_push_back(vector, &number);                                
-            }
-
-            else if(strcmp(token, "-d") == 0){
-                int number = atoi(strtok(NULL, ","));
-                int i;
-                int is_deleted = 0;
-                for (i = vector_get_size(vector) - 1; i >= 0 ; i--){
-                    if (*((int *)vector_at(vector, i)) == number){
-                        vector_erase(vector, i);
-                        snprintf(output_buf, BUF_SIZE, "Succesfully deleted all elements equal to %d\n", number);
-                        is_deleted = 1;
-                    }
-                }
-                if (!is_deleted) 
-                    snprintf(output_buf, BUF_SIZE, "There is no element equal to %d\n", number);
-            }
-
-            else if(strcmp(token, "-s") == 0){
-                char buf[16];
-                strcpy(output_buf, "Vector: ");
-                for(int i = 0; i < vector_get_size(vector); i++){
-                    if(i == vector_get_size(vector) - 1)
-                        snprintf(buf, sizeof(int)+1, "%d", *((int *)vector_at(vector, i)));
-                    else
-                        snprintf(buf, sizeof(int)+1, "%d,", *((int *)vector_at(vector, i)));
-
-                    logMessage(buf);
-                    strcat(output_buf, buf);
-                }
-                strcat(output_buf, "\n");
-            }
-
-            else if(strcmp(token, "-t") == 0){
-                backup_shutdown();
-                strcpy(output_buf, "System terminated!\n");
-                terminate = 1;
-            }
-
-            if (numRead != numWrite){
-                logOpen(LOG_FILE, "a");
-                char str[20];
-                snprintf(str, 20, "%ld-%ld\n", numWrite, numRead);
-                logMessage(str);
-                logClose();
-                exit(EXIT_FAILURE);
-            }            
-
-            logMessage("\n");
-            logClose();
-            message_count++;
-            memset(buf, 0, sizeof(buf));
-
-            if (write(connection_fd, output_buf, BUF_SIZE) == -1){
-                perror("write");
-                exit(EXIT_FAILURE);
-            }
-
-            if(terminate)
-                exit(EXIT_SUCCESS);
-        }
-
-        if (numRead == -1){
-            perror("read");
+        char buf[100];
+        snprintf(buf, sizeof(buf), "%.99s %d %.2f\n", command.student_info.name, command.student_info.id, command.student_info.grade);
+        logMessage(buf);
+        if (sendto(socket_fd, buf, read_bytes, 0, (struct sockaddr *) &claddr, len) != read_bytes)
             exit(EXIT_FAILURE);
-        }
-
-        if (close(connection_fd) == -1){
-            perror("close");
-            exit(EXIT_FAILURE);
-        }
-
-        if (message_count >= MAXIMUM_MESSAGE_COUNT) exit(EXIT_SUCCESS);
     }
+    logClose();
     return EXIT_SUCCESS;
 }

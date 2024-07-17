@@ -5,81 +5,36 @@
 #include <sys/un.h>
 #include <unistd.h>
 #include <string.h>
+#include <unistd.h>
+#include "common.h"
 
 #define BUF_SIZE 100
-#define SV_SOCK_PATH "/tmp/platform"
-
-void shift_buffer(char* buf, int buf_size, int start_index, int shift_amount){
-    for (int i = buf_size; i >= start_index; i--) {
-        buf[i + shift_amount] = buf[i];
-    }
-}
+#define SV_SOCK_PATH "/tmp/ud_ucase"
 
 void help_usage(){
     printf("Usage: cli [OPTIONS] [ARGUMENTS]\n");
     printf("OPTIONS:\n");
-    printf("\t-a: Add\n");
-    printf("\t-d: Delete\n");
+    printf("\t-a: Add student\n");
+    printf("\t-d: Delete with ID\n");
     printf("\t-s: Search\n");
     printf("ARGUMENTS:\n");
     printf("\t[ARGUMENTS]: Arguments to be sent to the server\n");
-    printf("\tExample: cli -a 3\n");
+    printf("EXAMPLE USAGE:\n");
+    printf("\tcli -a \"george 2521 3.75\"\n");
+    printf("\tcli -d 2521\n");
+    printf("\tcli -s\n");
     exit(0);
 }
 
-int main(int argc, char *argv[])
-{
-
-    if(argc < 2) help_usage();
-
-    int is_command_received = 0;
-    char buf[BUF_SIZE];
-    char commandbuf[BUF_SIZE];
-    int write_index = 0;
-    int commands_last_index = 0;
-
-    for (int i = 1; i < argc; i++){
-        if(strcmp(argv[i], "--help") == 0){
-            help_usage();
-            return 0;
-        }  
-        if (strncmp(argv[i], "-", 1) == 0){
-            for(int j = 0; j < strlen(argv[i] + 1); j++){
-                if ((strncmp(argv[i] + j + 1, "a", 1) == 0) || (strncmp(argv[i] + j + 1, "d", 1) == 0) || \
-                    (strncmp(argv[i] + j + 1, "s", 1) == 0) || (strncmp(argv[i] + j + 1, "t", 1) == 0)){
-                    if(is_command_received){
-                        printf("More than one commands are not allowed\n");
-                        return 1;
-                    }
-                    is_command_received = 1;
-
-                    shift_buffer(buf, BUF_SIZE, commands_last_index, 3);
-
-                    buf[commands_last_index++] = '-';
-                    memcpy(buf + commands_last_index++, argv[i] + j + 1, 1);
-                    buf[commands_last_index++] = ',';
-
-                    write_index += 3;
-                } else {
-                    printf("There is no such a command as %s (%.*s is not a valid command), --help for help\n", argv[i], 1, argv[i] + j + 1);
-                    return 1;
-                }
-            }
-        }
-        else{
-            snprintf(buf + write_index, sizeof(argv[i])+1, "%s,", argv[i]);
-            write_index += strlen(argv[i]) + 1; 
-        }
-    }
-    buf[--write_index] = '\0';
-
-    struct sockaddr_un addr;
-    int sfd;
-    ssize_t numRead;
+void send_command_to_daemon(daemon_command command){
+    struct sockaddr_un claddr, svaddr;
+    int socket_fd;
+    ssize_t read_bytes;
+    char resp[BUF_SIZE];
 
     /* Create client socket */
-    sfd = socket(AF_UNIX, SOCK_STREAM, 0);
-    if (sfd == -1)
+    socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
+    if (socket_fd == -1)
     {
         perror("socket");
         exit(EXIT_FAILURE);
@@ -87,38 +42,67 @@ int main(int argc, char *argv[])
 
     /* Using memset() to zero out the entire structure, rather than initializing individual fields,
     ensures that any nonstandard fields that are provided by some implementations are also initialized to 0.*/
-    memset(&addr, 0, sizeof(struct sockaddr_un));
+    memset(&claddr, 0, sizeof(struct sockaddr_un));
 
     /* Socket type is set to AF_UNIX */
-    addr.sun_family = AF_UNIX;
+    claddr.sun_family = AF_UNIX;
     /* Construct server address*/
-    strncpy(addr.sun_path, SV_SOCK_PATH, sizeof(addr.sun_path) - 1);
+    snprintf(claddr.sun_path, sizeof(claddr.sun_path), "/tmp/ud_ucase_cl.%ld", (long) getpid());
     /* Connect to server*/
-    if (connect(sfd, (struct sockaddr *)&addr, sizeof(struct sockaddr_un)) == -1)
-    {
-        perror("connect");
+    if (bind(socket_fd, (struct sockaddr *) &claddr, sizeof(struct sockaddr_un)) == -1)
         exit(EXIT_FAILURE);
-    }
 
-    int numWrite = write(sfd, buf, strlen(buf));
+    memset(&svaddr, 0, sizeof(struct sockaddr_un));
+    svaddr.sun_family = AF_UNIX;
+    strncpy(svaddr.sun_path, SV_SOCK_PATH, sizeof(svaddr.sun_path) - 1);
 
-    if (numWrite != write_index){
-        perror("error writing");
+    if (sendto(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &svaddr, sizeof(struct sockaddr_un))\
+         != sizeof(daemon_command))
         exit(EXIT_FAILURE);
-    }
 
-    if(read(sfd, buf, BUF_SIZE) == -1){
-        perror("read");
+    read_bytes = recvfrom(socket_fd, resp, BUF_SIZE, 0, NULL, NULL);
+    if (read_bytes == -1)
         exit(EXIT_FAILURE);
-    }
+    printf("Response: %.*s",(int) read_bytes, resp);
 
-    printf("%s", buf);
-
-    if(close(sfd) == -1){
-        perror("close");
-        exit(EXIT_FAILURE);
-    }
-
-    /* Closes our socket; server sees EOF */
+    remove(claddr.sun_path);            /* Remove client socket pathname */
     exit(EXIT_SUCCESS);
+}
+
+int main(int argc, char *argv[])
+{
+
+    if(argc < 2) help_usage();
+
+    daemon_command command;
+
+    int opt;
+    while ((opt = getopt(argc, argv, "a:d:sh")) != -1) {
+        switch (opt) {
+            case 'h':
+                help_usage();
+                break;
+            case 'a':
+                command.command_type = add;
+                command.student_info = parse_student_info(optarg);
+                printf("%s %d %f\n", command.student_info.name, command.student_info.id, command.student_info.grade);
+                break;
+            case 'd':
+                command.command_type = del;
+                command.student_info = (student){" ", atoi(optarg), 0};
+                printf("%s %d %f\n", command.student_info.name, command.student_info.id, command.student_info.grade);
+                break;
+            case 's':
+                command.command_type = show;
+                break;
+            case '?': // Case for unknown options or missing arguments
+                help_usage();
+                return EXIT_FAILURE;
+            default:
+                help_usage();
+                return EXIT_FAILURE;
+        }
+    }
+
+    send_command_to_daemon(command);
 }
