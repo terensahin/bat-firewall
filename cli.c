@@ -45,7 +45,8 @@ int main(int argc, char *argv[])
         }  
         if (strncmp(argv[i], "-", 1) == 0){
             for(int j = 0; j < strlen(argv[i] + 1); j++){
-                if ((strncmp(argv[i] + j + 1, "a", 1) == 0) || (strncmp(argv[i] + j + 1, "d", 1) == 0) || (strncmp(argv[i] + j + 1, "s", 1) == 0)){
+                if ((strncmp(argv[i] + j + 1, "a", 1) == 0) || (strncmp(argv[i] + j + 1, "d", 1) == 0) || \
+                    (strncmp(argv[i] + j + 1, "s", 1) == 0) || (strncmp(argv[i] + j + 1, "t", 1) == 0)){
                     if(is_command_received){
                         printf("More than one commands are not allowed\n");
                         return 1;

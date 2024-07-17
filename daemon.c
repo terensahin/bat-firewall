@@ -44,7 +44,6 @@ void logOpen(const char *logFilename)
         exit(EXIT_FAILURE);
 
     setbuf(logfp, NULL); /* Disable stdio buffering */
-
 }
 
 void logClose(void)
@@ -52,7 +51,7 @@ void logClose(void)
     fclose(logfp);
 }
 
-void backup(){
+void backup_shutdown(){
     logOpen(BACKUP_FILE);
     char buf[16];
     for(int i = 0; i < vector_get_size(vector); i++){
@@ -62,7 +61,36 @@ void backup(){
             snprintf(buf, sizeof(int)+1, "%d,", *((int *)vector_at(vector, i)));
         logMessage(buf);
     }
-    logClose()
+    logClose();
+}
+
+void backup_start(){
+    logOpen(LOG_FILE);
+    FILE *file = fopen(BACKUP_FILE, "a+");
+    if (file == NULL) {
+        return;
+    }
+
+    char buf[128];
+    size_t items_read = fread(buf, 1, sizeof(buf), file);
+
+    char str[20];
+    snprintf(str, 20, "%ld\n", items_read);
+    logMessage(str);
+
+    char *token;
+    token = strtok(buf, ",");
+    while (token != NULL){
+        logMessage("hello2\n");
+        int number = atoi(token);
+        vector = vector_push_back(vector, &number);
+        token = strtok(NULL, ",");
+    }
+    logMessage("hello3\n");
+    fclose(file);
+    logMessage("hello4\n");
+    logClose();
+    return;
 }
 
 static void skeleton_daemon()
@@ -98,7 +126,7 @@ static void skeleton_daemon()
 
     sigemptyset(&sa.sa_mask); /* Set handler for SIGTERM signal (backup on shutdown) */
     sa.sa_flags = SA_RESTART;
-    sa.sa_handler = backup;
+    sa.sa_handler = backup_shutdown;
     if (sigaction(SIGTERM, &sa, NULL) == -1) {
         perror("sigaction");
         exit(EXIT_FAILURE);
@@ -181,9 +209,11 @@ int create_socket()
 int main(int argc, char *argv[])
 {
     skeleton_daemon();
-    int error_int = open(ERR_FILE, O_APPEND | O_CREAT);
-    dup2(error_int, 2);
-    close(error_int);
+    vector = vector_initialize(vector, sizeof(int), NULL);
+    backup_start();
+    // int error_int = open(ERR_FILE, O_APPEND | O_CREAT);
+    // dup2(error_int, 2);
+    // close(error_int);
     int socket_fd = create_socket();
  
     int connection_fd;
@@ -192,7 +222,6 @@ int main(int argc, char *argv[])
     char output_buf[BUF_SIZE];
     char *token;
 
-    vector = vector_initialize(vector, sizeof(int), NULL);
     int message_count = 0;
     while (1)
     {
@@ -213,7 +242,7 @@ int main(int argc, char *argv[])
 	    
             /* get the first token */
             token = strtok(buf, ",");
-            
+            int terminate = 0;
             if (strcmp(token, "-a") == 0){
                 token = strtok(NULL, ",");
                 int number = atoi(token);
@@ -251,6 +280,12 @@ int main(int argc, char *argv[])
                 strcat(output_buf, "\n");
             }
 
+            else if(strcmp(token, "-t") == 0){
+                backup_shutdown();
+                strcpy(output_buf, "System terminated!\n");
+                terminate = 1;
+            }
+
             if (numRead != numWrite){
                 logOpen(LOG_FILE);
                 char str[20];
@@ -269,6 +304,9 @@ int main(int argc, char *argv[])
                 perror("write");
                 exit(EXIT_FAILURE);
             }
+
+            if(terminate)
+                exit(EXIT_SUCCESS);
         }
 
         if (numRead == -1){
