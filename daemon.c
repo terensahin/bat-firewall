@@ -14,12 +14,12 @@
 #include <sys/un.h>
 #include "c_dynamic_vector.h"
 
-static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
+static const char *LOG_FILE = "/home/ahmet/Desktop/daemon.log";
 
 #define SV_SOCK_PATH "/tmp/platform"
 #define BUF_SIZE 100
 #define BACKLOG 5
-
+static const char *ERR_FILE = "home/ahmet/Desktop/error.log";
 static FILE *logfp;
 
 ssize_t logMessage(const char *format)
@@ -151,13 +151,17 @@ int create_socket()
 int main(int argc, char *argv[])
 {
     skeleton_daemon();
-
+    int error_int = open(ERR_FILE, O_APPEND | O_CREAT);
+    dup2(error_int, 2);
+    close(error_int);
     int socket_fd = create_socket();
-
+ 
     int connection_fd;
     ssize_t numRead, numWrite;
     char buf[BUF_SIZE];
-
+    char *token;
+    int *vector;
+    vector = vector_initialize(vector, sizeof(int), NULL);
     int message_count = 0;
     while (1)
     {
@@ -178,7 +182,23 @@ int main(int argc, char *argv[])
             logOpen(LOG_FILE);
             numWrite = logMessage(buf);
             logClose();
+	    
+	    /* get the first token */
+  	    token = strtok(buf, ",");
+   		
+	    if(strcmp(token, "-a") == 0){
+		token = strtok(NULL, ",");
+		int number = atoi(token);
+	        vector = vector_push_back(vector, &number);
+	    }
+	    
+		logOpen(LOG_FILE);
+                char str[20];
+		int *ptr = vector_at(vector, 0);
 
+                snprintf(str, 20, "%d\n", *ptr);
+                logMessage(str);
+                logClose();
 
             if(numRead != numWrite){
                 logOpen(LOG_FILE);
