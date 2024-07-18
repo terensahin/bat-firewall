@@ -57,6 +57,7 @@ void exit_with_log(char *err){
     log_open(ERR_FILE, "a");
     log_message(err);
     log_close();
+    backup_shutdown();
     exit(EXIT_FAILURE);
 }
 
@@ -71,6 +72,7 @@ void backup_shutdown(){
         log_message(tmpbuf);
     }
     log_close();
+    vector_free(vector);
 }
 
 /*  
