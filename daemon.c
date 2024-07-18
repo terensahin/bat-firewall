@@ -53,13 +53,7 @@ void log_close(void)
 }
 
 
-void exit_with_log(char *err){
-    log_open(ERR_FILE, "a");
-    log_message(err);
-    log_close();
-    backup_shutdown();
-    exit(EXIT_FAILURE);
-}
+
 
 void backup_shutdown(){
     log_open(BACKUP_FILE, "w");
@@ -109,6 +103,15 @@ void backup_start(){
     fclose(file);
     log_close(); 
     return;
+}
+
+
+void exit_with_log(char *err){
+    log_open(ERR_FILE, "a");
+    log_message(err);
+    log_close();
+    backup_shutdown();
+    exit(EXIT_FAILURE);
 }
 
 static void skeleton_daemon()
@@ -267,8 +270,6 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
 int main(int argc, char *argv[])
 {
     skeleton_daemon();
-
-    log_open(LOG_FILE, "a");
 
     vector = vector_initialize(vector, sizeof(student), NULL);
     backup_start();
