@@ -20,7 +20,7 @@ static const char *ERR_FILE = "home/baranbolo/Desktop/platform_i/error.log";
 static const char *BACKUP_FILE = "home/baranbolo/Desktop/platform_i/backup.log";
 
 #define SV_SOCK_PATH "/tmp/ud_ucase"
-#define BUF_SIZE 100
+#define BUF_SIZE 1024
 #define BACKLOG 5
 #define MAXIMUM_MESSAGE_COUNT 10
 
@@ -66,9 +66,7 @@ void backup_shutdown(){
 }
 
 void backup_start(){
-    vector = vector_initialize(vector, sizeof(int), NULL);
-
-    logOpen(LOG_FILE, "a");
+    vector = vector_initialize(vector, sizeof(student), NULL);
     FILE *file = fopen(BACKUP_FILE, "a+");
     if (file == NULL) {
         return;
@@ -79,20 +77,15 @@ void backup_start(){
 
     char str[20];
     snprintf(str, 20, "%ld\n", items_read);
-    logMessage(str);
 
     char *token;
     token = strtok(buf, ",");
     while (token != NULL){
-        logMessage("hello2\n");
         int number = atoi(token);
         vector = vector_push_back(vector, &number);
         token = strtok(NULL, ",");
     }
-    logMessage("hello3\n");
     fclose(file);
-    logMessage("hello4\n");
-    logClose();
     return;
 }
 
@@ -209,32 +202,66 @@ int create_socket()
     return socket_fd;
 }
 
+void execute_command(daemon_command command, char* response, ssize_t *command_len){
+    switch (command.command_type)
+    {
+    case add:
+        student tmpstd = command.student_info;
+        vector = vector_push_back(vector, &tmpstd);
+        snprintf(response, BUF_SIZE, "Successfully added student: Name: %s, ID: %d, Grade: %f\n" ,\
+            command.student_info.name, command.student_info.id, command.student_info.grade);
+        break;
+    case del:
+        int delete_id = command.student_info.id;
+        for(int i = vector_get_size(vector) - 1; i >= 0; i--){
+            student *tmpstd = vector_at(vector, i);
+            if(tmpstd->id == delete_id){
+                vector_erase(vector, i);
+            }
+        }
+        snprintf(response, BUF_SIZE, "Successfully deleted student with id %d\n", delete_id);
+        break;
+    case show:
+        snprintf(response, BUF_SIZE, "All students:\n" );
+        for(int i = 0; i < vector_get_size(vector); i++){
+            student *tmpstd = vector_at(vector, i);
+            char tmpbuf[128];
+            snprintf(tmpbuf, 128, "Name: %s, ID: %d, Grade: %f\n", tmpstd->name, tmpstd->id, tmpstd->grade);
+            strcat(response, tmpbuf);
+        }
+        break;
+    default:
+        snprintf(response, BUF_SIZE, "Unknown command\n" );
+        break;
+    }
+    *command_len = strlen(response);
+    return;
+}
+
 int main(int argc, char *argv[])
 {
     skeleton_daemon();
 
+    logOpen(LOG_FILE, "a");
+
     backup_start();
 
     int socket_fd = create_socket();
- 
+
     struct sockaddr_un claddr;
-    socklen_t len;
-    ssize_t read_bytes;
+    socklen_t len = sizeof(struct sockaddr_un);
+    ssize_t command_bytes;
     daemon_command command;
-    logOpen(LOG_FILE, "a");
+    char response[BUF_SIZE];
     while (1) {
-        read_bytes = recvfrom(socket_fd, &command, sizeof(daemon_command) * 2, 0,
-                            (struct sockaddr_un *) &claddr, &len);
-        if (read_bytes == -1){
+        if (recvfrom(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &claddr, &len) == -1)
+            exit(EXIT_FAILURE);
+
+        execute_command(command, response, &command_bytes);
+
+        if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){
             exit(EXIT_FAILURE);
         }
-
-        char buf[100];
-        snprintf(buf, sizeof(buf), "%.99s %d %.2f\n", command.student_info.name, command.student_info.id, command.student_info.grade);
-        logMessage(buf);
-        if (sendto(socket_fd, buf, read_bytes, 0, (struct sockaddr *) &claddr, len) != read_bytes)
-            exit(EXIT_FAILURE);
     }
-    logClose();
     return EXIT_SUCCESS;
 }

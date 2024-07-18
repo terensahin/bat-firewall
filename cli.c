@@ -47,7 +47,7 @@ int send_command_to_daemon(daemon_command command, struct sockaddr_un *claddr){
     /* Construct server address*/
     snprintf((*claddr).sun_path, sizeof((*claddr).sun_path), "/tmp/ud_ucase_cl.%ld", (long) getpid());
     /* Connect to server*/
-    if (bind(socket_fd, claddr, sizeof(struct sockaddr_un)) == -1)
+    if (bind(socket_fd, (struct sockaddr *) claddr, sizeof(struct sockaddr_un)) == -1)
         exit(EXIT_FAILURE);
 
     memset(&svaddr, 0, sizeof(struct sockaddr_un));
@@ -98,6 +98,7 @@ int main(int argc, char *argv[])
                 break;
             case 's':
                 command.command_type = show;
+                command.student_info = (student){" ", 0, 0};
                 break;
             case '?': // Case for unknown options or missing arguments
                 help_usage();
