@@ -15,9 +15,9 @@
 #include "c_vector.h"
 #include "common.h"
 
-static const char *LOG_FILE = "/home/terensahin/Documents/platform_i//daemon.log";
-static const char *ERR_FILE = "/home/terensahin/Documents/platform_i//error.log";
-static const char *BACKUP_FILE = "/home/terensahin/Documents/platform_i//backup.log";
+static const char *LOG_FILE = "/home/ahmet/work/airties/daemon/daemon.log";
+static const char *ERR_FILE = "/home/ahmet/work/airties/daemon/error.log";
+static const char *BACKUP_FILE = "/home/ahmet/work/airties/daemon/backup.log";
 
 #define SV_SOCK_PATH "/tmp/ud_ucase"
 #define BUF_SIZE 1024
@@ -42,7 +42,7 @@ void log_open(const char *logFilename, char* open_mode)
     umask(m);
 
     if (logfp == NULL) /* If opening the log fails */
-        exit(EXIT_FAILURE);
+        exit_with_log("Error opening log");
 
     setbuf(logfp, NULL); /* Disable stdio buffering */
 }
@@ -121,42 +121,39 @@ static void skeleton_daemon()
     pid = fork(); /* This fork is to leave from process group */
 
     if (pid < 0) /* fork error */
-        exit(EXIT_FAILURE);
+        exit_with_log("Error daemon, Fork");
 
     if (pid > 0)
     { /* Parent exits */
-        exit(EXIT_SUCCESS);
+    	exit(EXIT_SUCCESS);
     }
 
     /*child continues*/
     if (setsid() < 0) /* Child process becomes leader of his own session */
-        exit(EXIT_FAILURE);
+        exit_with_log("Error setting session ID");
 
     struct sigaction sa; /* Ignore SIGCHLD and SIGHUP signals */
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = SIG_IGN;
     if (sigaction(SIGHUP, &sa, NULL) == -1) {
-        perror("sigaction");
-        exit(EXIT_FAILURE);
+        exit_with_log("Sigaction");
     }
     if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        perror("sigaction");
-        exit(EXIT_FAILURE);
+        exit_with_log("Sigaction");
     }
 
     sigemptyset(&sa.sa_mask); /* Set handler for SIGTERM signal (backup on shutdown) */
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = backup_shutdown;
     if (sigaction(SIGTERM, &sa, NULL) == -1) {
-        perror("sigaction");
-        exit(EXIT_FAILURE);
+        exit_with_log("Sigaction");
     }
 
     pid = fork(); /* This fork is to prevent access to the terminal */
 
     if (pid < 0) /* fork error*/
-        exit(EXIT_FAILURE);
+        exit_with_log("Error daemon, Fork");
 
     if (pid > 0) /* Parent exits */
         exit(EXIT_SUCCESS);
@@ -179,11 +176,11 @@ static void skeleton_daemon()
 
     int fd = open("/dev/null", O_RDWR); /* 0,1,2 file desciptors are pointed to null, so functions using stdin or stdout does not generate error */
     if (fd != STDIN_FILENO)             /* 'fd' should be 0 */
-        exit(EXIT_FAILURE);
+        exit_with_log("Error File descriptor");
     if (dup2(STDIN_FILENO, STDOUT_FILENO) != STDOUT_FILENO)
-        exit(EXIT_FAILURE);
+        exit_with_log("Error File descriptor");
     if (dup2(STDIN_FILENO, STDERR_FILENO) != STDERR_FILENO)
-        exit(EXIT_FAILURE);
+        exit_with_log("Error File descriptor");
 }
 
 int create_socket()
@@ -194,15 +191,14 @@ int create_socket()
     socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (socket_fd == -1)
     {
-        perror("Error creating socket!");
-        exit(EXIT_FAILURE);
+	exit_with_log("Error creating socket!");
     }
 
     if (strlen(SV_SOCK_PATH) > sizeof(socket_address.sun_path) - 1)
-        exit(EXIT_FAILURE);
+        exit_with_log("Error Socket");
 
     if (remove(SV_SOCK_PATH) == -1 && errno != ENOENT)
-        exit(EXIT_FAILURE);
+        exit_with_log("Error Socket");
 
     memset(&socket_address, 0, sizeof(struct sockaddr_un)); /* Cleared the socket_address */
     socket_address.sun_family = AF_UNIX;                    /* UNIX domain address */
@@ -212,12 +208,9 @@ int create_socket()
     {
         if (errno == EADDRINUSE)
         {
-            perror("socket in use");
-            exit(EXIT_FAILURE);
+            exit_with_log("Error Socket in use");
         }
-        perror("binding error ");
-
-        exit(EXIT_FAILURE);
+        exit_with_log("Error Binding");
     }
 
     // change
@@ -231,12 +224,14 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
     switch (command.command_type)
     {
     case add:
+	    ;
         student tmpstd = command.student_info;
         vector = vector_push_back(vector, &tmpstd);
         snprintf(response, BUF_SIZE, "Successfully added student: Name: %s, ID: %d, Grade: %f\n" ,\
             command.student_info.name, command.student_info.id, command.student_info.grade);
         break;
     case del:
+	;
         int delete_id = command.student_info.id;
         for(int i = vector_get_size(vector) - 1; i >= 0; i--){
             student *tmpstd = vector_at(vector, i);
@@ -283,12 +278,12 @@ int main(int argc, char *argv[])
     char response[BUF_SIZE];
     while (1) {
         if (recvfrom(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &claddr, &len) == -1)
-            exit(EXIT_FAILURE);
+            exit_with_log("Error recieveing info");
 
         execute_command(command, response, &command_bytes);
 
         if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){
-            exit(EXIT_FAILURE);
+            exit_with_log("Error sending info");
         }
 
         if(command.command_type == terminate){
