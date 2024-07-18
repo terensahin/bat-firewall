@@ -15,9 +15,9 @@
 #include "c_vector.h"
 #include "common.h"
 
-static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
-static const char *ERR_FILE = "home/baranbolo/Desktop/platform_i/error.log";
-static const char *BACKUP_FILE = "home/baranbolo/Desktop/platform_i/backup.log";
+static const char *LOG_FILE = "/home/terensahin/Documents/platform_i//daemon.log";
+static const char *ERR_FILE = "/home/terensahin/Documents/platform_i//error.log";
+static const char *BACKUP_FILE = "/home/terensahin/Documents/platform_i//backup.log";
 
 #define SV_SOCK_PATH "/tmp/ud_ucase"
 #define BUF_SIZE 1024
@@ -28,12 +28,12 @@ static FILE *logfp;
 
 int *vector;
 
-ssize_t logMessage(const char *format)
+ssize_t log_message(const char *format)
 {
     return fprintf(logfp, "%s", format); /* Writes to opened log file */
 }
 
-void logOpen(const char *logFilename, char* open_mode)
+void log_open(const char *logFilename, char* open_mode)
 {
     mode_t m;
 
@@ -47,45 +47,71 @@ void logOpen(const char *logFilename, char* open_mode)
     setbuf(logfp, NULL); /* Disable stdio buffering */
 }
 
-void logClose(void)
+void log_close(void)
 {
     fclose(logfp);
 }
 
-void backup_shutdown(){
-    logOpen(BACKUP_FILE, "w");
-    char buf[16];
-    for(int i = 0; i < vector_get_size(vector); i++){
-        if(i == vector_get_size(vector) - 1)
-            snprintf(buf, sizeof(int)+1, "%d", *((int *)vector_at(vector, i)));
-        else
-            snprintf(buf, sizeof(int)+1, "%d,", *((int *)vector_at(vector, i)));
-        logMessage(buf);
-    }
-    logClose();
+
+void exit_with_log(char *err){
+    log_open(ERR_FILE, "a");
+    log_message(err);
+    log_close();
+    exit(EXIT_FAILURE);
 }
 
+void backup_shutdown(){
+    log_open(BACKUP_FILE, "w");
+    char tmpbuf[128];
+    snprintf(tmpbuf, 16, "%d\n", vector_get_size(vector));
+    log_message(tmpbuf);
+    for(int i = 0; i < vector_get_size(vector); i++){
+        student *tmpstd = vector_at(vector, i);
+        snprintf(tmpbuf, 128, "%s,%d,%f\n", tmpstd->name, tmpstd->id, tmpstd->grade);
+        log_message(tmpbuf);
+    }
+    log_close();
+}
+
+/*  
+    Read the backup file and fill the vector
+*/
 void backup_start(){
-    vector = vector_initialize(vector, sizeof(student), NULL);
+    log_open(LOG_FILE, "a");
     FILE *file = fopen(BACKUP_FILE, "a+");
     if (file == NULL) {
         return;
     }
 
-    char buf[128];
-    size_t items_read = fread(buf, 1, sizeof(buf), file);
+    log_message("Backup file opened\n");
 
-    char str[20];
-    snprintf(str, 20, "%ld\n", items_read);
-
-    char *token;
-    token = strtok(buf, ",");
-    while (token != NULL){
-        int number = atoi(token);
-        vector = vector_push_back(vector, &number);
-        token = strtok(NULL, ",");
+    int vector_size;
+    if (fscanf(file, "%d\n", &vector_size) != 1) {
+        fclose(file);
+        log_close();
+        return;
     }
+
+    char buf[16];
+    snprintf(buf, 16, "%d\n", vector_size);
+    log_message(buf);
+
+    int readed_number;
+    student tmpstd;
+    for(int i = 0; i < vector_size; i++){
+        log_message("Reading backup file\n");
+        readed_number = fscanf(file, "%[^,],%d,%f\n", tmpstd.name, &tmpstd.id, &tmpstd.grade);
+        if(readed_number != 3){
+            break;
+        }
+        log_message("Readed student\n");
+        vector = vector_push_back(vector, &tmpstd);
+    }
+
+
+    log_message("Backup file readed successfully\n");
     fclose(file);
+    log_close(); 
     return;
 }
 
@@ -242,8 +268,9 @@ int main(int argc, char *argv[])
 {
     skeleton_daemon();
 
-    logOpen(LOG_FILE, "a");
+    log_open(LOG_FILE, "a");
 
+    vector = vector_initialize(vector, sizeof(student), NULL);
     backup_start();
 
     int socket_fd = create_socket();

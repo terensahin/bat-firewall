@@ -8,7 +8,7 @@
 #include <unistd.h>
 #include "common.h"
 
-#define BUF_SIZE 100
+#define BUF_SIZE 1024
 #define SV_SOCK_PATH "/tmp/ud_ucase"
 
 void help_usage(){
