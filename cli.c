@@ -26,11 +26,9 @@ void help_usage(){
     exit(0);
 }
 
-void send_command_to_daemon(daemon_command command){
-    struct sockaddr_un claddr, svaddr;
+int send_command_to_daemon(daemon_command command, struct sockaddr_un *claddr){
+    struct sockaddr_un svaddr;
     int socket_fd;
-    ssize_t read_bytes;
-    char resp[BUF_SIZE];
 
     /* Create client socket */
     socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
@@ -42,14 +40,14 @@ void send_command_to_daemon(daemon_command command){
 
     /* Using memset() to zero out the entire structure, rather than initializing individual fields,
     ensures that any nonstandard fields that are provided by some implementations are also initialized to 0.*/
-    memset(&claddr, 0, sizeof(struct sockaddr_un));
+    memset(claddr, 0, sizeof(struct sockaddr_un));
 
     /* Socket type is set to AF_UNIX */
-    claddr.sun_family = AF_UNIX;
+    (*claddr).sun_family = AF_UNIX;
     /* Construct server address*/
-    snprintf(claddr.sun_path, sizeof(claddr.sun_path), "/tmp/ud_ucase_cl.%ld", (long) getpid());
+    snprintf((*claddr).sun_path, sizeof((*claddr).sun_path), "/tmp/ud_ucase_cl.%ld", (long) getpid());
     /* Connect to server*/
-    if (bind(socket_fd, (struct sockaddr *) &claddr, sizeof(struct sockaddr_un)) == -1)
+    if (bind(socket_fd, claddr, sizeof(struct sockaddr_un)) == -1)
         exit(EXIT_FAILURE);
 
     memset(&svaddr, 0, sizeof(struct sockaddr_un));
@@ -60,13 +58,19 @@ void send_command_to_daemon(daemon_command command){
          != sizeof(daemon_command))
         exit(EXIT_FAILURE);
 
+    return socket_fd;
+}
+
+void wait_response(int socket_fd, struct sockaddr_un claddr){
+    ssize_t read_bytes;
+    char resp[BUF_SIZE];
     read_bytes = recvfrom(socket_fd, resp, BUF_SIZE, 0, NULL, NULL);
     if (read_bytes == -1)
         exit(EXIT_FAILURE);
     printf("Response: %.*s",(int) read_bytes, resp);
 
     remove(claddr.sun_path);            /* Remove client socket pathname */
-    exit(EXIT_SUCCESS);
+    return;
 }
 
 int main(int argc, char *argv[])
@@ -104,5 +108,11 @@ int main(int argc, char *argv[])
         }
     }
 
-    send_command_to_daemon(command);
+    struct sockaddr_un claddr;
+    int socket_fd;
+
+    socket_fd = send_command_to_daemon(command, &claddr);
+    wait_response(socket_fd, claddr);
+
+    exit(EXIT_SUCCESS);
 }
