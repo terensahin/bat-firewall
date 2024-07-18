@@ -91,11 +91,6 @@ void backup_start(){
         log_close();
         return;
     }
-
-    char buf[16];
-    snprintf(buf, 16, "%d\n", vector_size);
-    log_message(buf);
-
     int readed_number;
     student tmpstd;
     for(int i = 0; i < vector_size; i++){
@@ -107,7 +102,6 @@ void backup_start(){
         log_message("Readed student\n");
         vector = vector_push_back(vector, &tmpstd);
     }
-
 
     log_message("Backup file readed successfully\n");
     fclose(file);
@@ -256,6 +250,10 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
             strcat(response, tmpbuf);
         }
         break;
+    case terminate:
+        snprintf(response, BUF_SIZE, "Terminating daemon\n" );
+        backup_shutdown();
+        break;
     default:
         snprintf(response, BUF_SIZE, "Unknown command\n" );
         break;
@@ -288,6 +286,10 @@ int main(int argc, char *argv[])
 
         if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){
             exit(EXIT_FAILURE);
+        }
+
+        if(command.command_type == terminate){
+            return EXIT_SUCCESS;
         }
     }
     return EXIT_SUCCESS;

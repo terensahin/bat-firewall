@@ -10,7 +10,8 @@ typedef struct student{
 typedef enum command{
     add,
     del,
-    show
+    show,
+    terminate
 }command;
 
 typedef struct daemon_command{
