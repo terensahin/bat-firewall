@@ -248,6 +248,10 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
         snprintf(response, BUF_SIZE, "Terminating daemon\n" );
         backup_shutdown();
         break;
+    case chlog:
+        snprintf(response, BUF_SIZE, "Changed debug log\n" );
+        log_set_level(command.log_level);
+        break;
     default:
         snprintf(response, BUF_SIZE, "Unknown command\n" );
         break;
@@ -287,16 +291,15 @@ int main(int argc, char *argv[])
 
     int socket_fd = create_socket();
 
-    log_trace("HELLO");
-    log_info("HELLO");
-    log_error("HELLO");
-
     struct sockaddr_un claddr;
     socklen_t len = sizeof(struct sockaddr_un);
     ssize_t command_bytes;
     daemon_command command;
     char response[BUF_SIZE];
     while (1) {
+        log_trace("BEFORE");
+        log_info("BEFORE");
+        log_error("BEFORE");
         if (recvfrom(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &claddr, &len) == -1)
             exit(EXIT_FAILURE);
 
@@ -309,6 +312,10 @@ int main(int argc, char *argv[])
         if(command.command_type == terminate){
             return EXIT_SUCCESS;
         }
+
+        log_trace("AFTER");
+        log_info("AFTER");
+        log_error("AFTER");
     }
     fclose(logfp);
     return EXIT_SUCCESS;

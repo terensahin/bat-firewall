@@ -81,7 +81,7 @@ int main(int argc, char *argv[])
     daemon_command command;
 
     int opt;
-    while ((opt = getopt(argc, argv, "a:d:sht")) != -1) {
+    while ((opt = getopt(argc, argv, "a:d:shtl:")) != -1) {
         switch (opt) {
             case 'h':
                 help_usage();
@@ -103,6 +103,10 @@ int main(int argc, char *argv[])
             case 't':
                 command.command_type = terminate;
                 command.student_info = (student){" ", 0, 0};
+                break;
+            case 'l':
+                command.command_type = chlog;
+                command.log_level = atoi(optarg);
                 break;
             case '?': // Case for unknown options or missing arguments
                 help_usage();

@@ -11,12 +11,14 @@ typedef enum command{
     add,
     del,
     show,
-    terminate
+    terminate,
+    chlog
 }command;
 
 typedef struct daemon_command{
     command command_type;
     student student_info;
+    int log_level;
 }daemon_command;
 
 student create_student(char* name, int id, float grade);
