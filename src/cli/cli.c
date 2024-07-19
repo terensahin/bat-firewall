@@ -6,7 +6,8 @@
 #include <unistd.h>
 #include <string.h>
 #include <unistd.h>
-#include "common.h"
+
+#include "../common.h"
 
 #define BUF_SIZE 1024
 #define SV_SOCK_PATH "/tmp/ud_ucase"

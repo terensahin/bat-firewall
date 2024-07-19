@@ -12,8 +12,9 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/un.h>
-#include "c_vector.h"
-#include "common.h"
+
+#include "../c_vector.h"
+#include "../common.h"
 #include "log.h"
 
 static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
