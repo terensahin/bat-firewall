@@ -24,45 +24,11 @@ static const char *BACKUP_FILE = "/home/baranbolo/Desktop/platform_i/backup.log"
 #define BACKLOG 5
 #define MAXIMUM_MESSAGE_COUNT 10
 
-static FILE *logfp;
-// static FILE *logfp2;
+FILE *logfp;
 int *vector;
 
-// char *get_time()
-// {
-//     time_t t;
-//     char *str_t;
-//     time(&t);
-//     str_t = ctime(&t);
-//     str_t[strlen(str_t) - 1] = '\0';
-//     return str_t;
-// }
-
-// ssize_t log_message(const char *format)
-// {
-//     return fprintf(logfp2, "[%-20s] : %s", format, get_time()); /* Writes to opened log file */
-// }
- 
-// void log_open(const char *logFilename, char* open_mode)
-// {
-//     mode_t m;
- 
-//     m = umask(077);                  /* To recover old mask */
-//     logfp2 = fopen(logFilename, open_mode); /* File is opened with permissions 700 */
-//     umask(m);
- 
-//     if (logfp2 == NULL) /* If opening the log fails */
-//         exit(EXIT_FAILURE);
- 
-//     setbuf(logfp2, NULL); /* Disable stdio buffering */
-// }
- 
-// void log_close(void)
-// {
-//     fclose(logfp2);
-// }
-
 void backup_shutdown(){
+    log_trace("shotdown back up started");
     FILE *file = fopen(BACKUP_FILE, "w");
 
     fprintf(file, "%d\n", vector_get_size(vector));
@@ -71,7 +37,9 @@ void backup_shutdown(){
         fprintf(file, "%s,%d,%f\n", tmpstd->name, tmpstd->id, tmpstd->grade);
     }
     vector_free(vector);
+    log_trace("vector freed");
     fclose(file);
+    log_trace("log file is closed");
     fclose(logfp);
 }
 
@@ -81,25 +49,30 @@ void backup_shutdown(){
 void backup_start(){
     FILE *file = fopen(BACKUP_FILE, "a+");
     if (file == NULL) {
+        log_error("back up file could not be opened");
         return;
     }
 
     int vector_size;
     if (fscanf(file, "%d\n", &vector_size) != 1) {
         fclose(file);
+        log_warn("Backup is empty or scanning error");
         return;
     }
+
     int readed_number;
     student tmpstd;
     for(int i = 0; i < vector_size; i++){
         readed_number = fscanf(file, "%[^,],%d,%f\n", tmpstd.name, &tmpstd.id, &tmpstd.grade);
         if(readed_number != 3){
+            log_warn("Unexpected backup style");
             break;
         }
         vector = vector_push_back(vector, &tmpstd);
     }
 
     fclose(file);
+    log_trace("vector backed up");
     return;
 }
 
@@ -109,28 +82,31 @@ static void skeleton_daemon()
 
     pid = fork(); /* This fork is to leave from process group */
 
-    if (pid < 0) /* fork error */
+    if (pid < 0){  /* fork error */
+        log_error("error in first fork");
         exit(EXIT_FAILURE);
+    }
 
-    if (pid > 0)
-    { /* Parent exits */
+    if (pid > 0){ /* Parent exits */
         exit(EXIT_SUCCESS);
     }
 
     /*child continues*/
-    if (setsid() < 0) /* Child process becomes leader of his own session */
+    if (setsid() < 0){ /* Child process becomes leader of his own session */
+        log_error("error creating session");
         exit(EXIT_FAILURE);
+    } 
 
     struct sigaction sa; /* Ignore SIGCHLD and SIGHUP signals */
     sigemptyset(&sa.sa_mask);
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = SIG_IGN;
     if (sigaction(SIGHUP, &sa, NULL) == -1) {
-        perror("sigaction");
+        log_error("error sigaction 1");
         exit(EXIT_FAILURE);
     }
     if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        perror("sigaction");
+        log_error("error sigaction 2");
         exit(EXIT_FAILURE);
     }
 
@@ -138,17 +114,20 @@ static void skeleton_daemon()
     sa.sa_flags = SA_RESTART;
     sa.sa_handler = backup_shutdown;
     if (sigaction(SIGTERM, &sa, NULL) == -1) {
-        perror("sigaction");
+        log_error("error sigaction 3");
         exit(EXIT_FAILURE);
     }
 
     pid = fork(); /* This fork is to prevent access to the terminal */
 
-    if (pid < 0) /* fork error*/
+    if (pid < 0){  /* fork error */
+        log_error("error in first fork");
         exit(EXIT_FAILURE);
+    }
 
-    if (pid > 0) /* Parent exits */
+    if (pid > 0){ /* Parent exits */
         exit(EXIT_SUCCESS);
+    }
 
     /* Grandchild continues */
 
@@ -165,6 +144,7 @@ static void skeleton_daemon()
     {
         close(i);
     }
+    log_trace("file descriptors of daemon are closed");
 
     int fd = open("/dev/null", O_RDWR); /* 0,1,2 file desciptors are pointed to null, so functions using stdin or stdout does not generate error */
     if (fd != STDIN_FILENO)             /* 'fd' should be 0 */
@@ -173,6 +153,9 @@ static void skeleton_daemon()
         exit(EXIT_FAILURE);
     if (dup2(STDIN_FILENO, STDERR_FILENO) != STDERR_FILENO)
         exit(EXIT_FAILURE);
+    log_trace("stdin stdout and stderr is mapped to dev/null");
+    log_trace("Daemon is successfully created");
+    return;
 }
 
 int create_socket()
@@ -183,15 +166,20 @@ int create_socket()
     socket_fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (socket_fd == -1)
     {
-        perror("Error creating socket!");
+        log_error("socket could not be created");
         exit(EXIT_FAILURE);
     }
 
-    if (strlen(SV_SOCK_PATH) > sizeof(socket_address.sun_path) - 1)
+    if (strlen(SV_SOCK_PATH) > sizeof(socket_address.sun_path) - 1){
+        log_error("socket path name is too long");
         exit(EXIT_FAILURE);
+    }
 
-    if (remove(SV_SOCK_PATH) == -1 && errno != ENOENT)
+    if (remove(SV_SOCK_PATH) == -1 && errno != ENOENT){
+        log_error("existing socket could not be removed");
         exit(EXIT_FAILURE);
+    }
+    log_trace("socket is created");
 
     memset(&socket_address, 0, sizeof(struct sockaddr_un)); /* Cleared the socket_address */
     socket_address.sun_family = AF_UNIX;                    /* UNIX domain address */
@@ -201,18 +189,13 @@ int create_socket()
     {
         if (errno == EADDRINUSE)
         {
-            perror("socket in use");
+            log_error("socket is in use");
             exit(EXIT_FAILURE);
         }
-        perror("binding error ");
-
+        log_error("bind error");
         exit(EXIT_FAILURE);
     }
-
-    // change
-    // if (listen(socket_fd, BACKLOG) == -1)
-    //     exit(EXIT_FAILURE);
-
+    log_trace("socket is binded");
     return socket_fd;
 }
 
@@ -256,6 +239,7 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
         snprintf(response, BUF_SIZE, "Unknown command\n" );
         break;
     }
+    //log_trace(response);
     *command_len = strlen(response);
     return;
 }
@@ -270,23 +254,21 @@ FILE *set_log_levels(){
     }
     log_add_fp(fp, 0);
 
+    log_trace("initialized log levels");
     return fp;
 }
 
-int main(int argc, char *argv[])
+int main()
 {
     skeleton_daemon();
 
-    // log_open(LOG_FILE, "a");
-
-    // log_message("hello\n");
-    FILE *logfp = set_log_levels();
+    logfp = set_log_levels();
     if (logfp == NULL){
         exit(EXIT_FAILURE);
     }
-    // log_message("hello2\n");
 
     vector = vector_initialize(vector, sizeof(student), NULL);
+    log_trace("Vector is initialized");
     backup_start();
 
     int socket_fd = create_socket();
@@ -297,26 +279,24 @@ int main(int argc, char *argv[])
     daemon_command command;
     char response[BUF_SIZE];
     while (1) {
-        log_trace("BEFORE");
-        log_info("BEFORE");
-        log_error("BEFORE");
-        if (recvfrom(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &claddr, &len) == -1)
+        log_trace("waiting for command");
+        if (recvfrom(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &claddr, &len) == -1){
+            log_error("command could not be read properly");
             exit(EXIT_FAILURE);
+        }
 
         execute_command(command, response, &command_bytes);
 
         if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){
+            log_error("response could not be sent properly");
             exit(EXIT_FAILURE);
         }
 
         if(command.command_type == terminate){
             return EXIT_SUCCESS;
         }
-
-        log_trace("AFTER");
-        log_info("AFTER");
-        log_error("AFTER");
+        
+        log_trace("response is sent");
     }
-    fclose(logfp);
     return EXIT_SUCCESS;
 }

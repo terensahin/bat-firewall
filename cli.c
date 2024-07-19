@@ -67,7 +67,7 @@ void wait_response(int socket_fd, struct sockaddr_un claddr){
     read_bytes = recvfrom(socket_fd, resp, BUF_SIZE, 0, NULL, NULL);
     if (read_bytes == -1)
         exit(EXIT_FAILURE);
-    printf("Response: %.*s",(int) read_bytes, resp);
+    printf("%.*s",(int) read_bytes, resp);
 
     remove(claddr.sun_path);            /* Remove client socket pathname */
     return;
@@ -89,12 +89,10 @@ int main(int argc, char *argv[])
             case 'a':
                 command.command_type = add;
                 command.student_info = parse_student_info(optarg);
-                printf("%s %d %f\n", command.student_info.name, command.student_info.id, command.student_info.grade);
                 break;
             case 'd':
                 command.command_type = del;
                 command.student_info = (student){" ", atoi(optarg), 0};
-                printf("%s %d %f\n", command.student_info.name, command.student_info.id, command.student_info.grade);
                 break;
             case 's':
                 command.command_type = show;
