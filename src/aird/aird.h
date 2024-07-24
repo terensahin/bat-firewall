@@ -9,8 +9,8 @@
 #define BACKLOG 5
 #define MAXIMUM_MESSAGE_COUNT 10
 
-static const char *LOG_FILE = "/home/baranbologur/Desktop/daemon.log";
-static const char *BACKUP_FILE = "/home/baranbologur/Desktop/backup.log";
+static const char *LOG_FILE = "/home/ahmet/work/airties/daemon/daemon.log";
+static const char *BACKUP_FILE = "/home/ahmet/work/airties/daemon/backup.log";
 
 int ioctl_set_msg(int file_desc, char *message);
 int ioctl_func(char* data);

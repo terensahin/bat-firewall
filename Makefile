@@ -1,7 +1,7 @@
 CC = gcc
 
 TARGETS = aird cli
-SUBDIRS = src src/aird src/cli build
+SUBDIRS = src src/aird src/cli src/kmod build
 
 .PHONY: all clean $(SUBDIRS)
 
