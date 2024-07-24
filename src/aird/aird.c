@@ -30,6 +30,65 @@ static const char *BACKUP_FILE = "/home/terensahin/Desktop/backup.log";
 FILE *logfp;
 int *vector;
 
+
+/* Functions for the ioctl calls */ 
+ 
+int ioctl_set_msg(int file_desc, char *message) 
+{ 
+    int ret_val; 
+ 
+    ret_val = ioctl(file_desc, IOCTL_SET_MSG, message); 
+ 
+    if (ret_val < 0) { 
+        printf("ioctl_set_msg failed:%d\n", ret_val); 
+    } 
+ 
+    return ret_val; 
+}
+
+int ioctl_func(char* data){
+	
+    int file_desc, ret_val;
+    
+    log_trace("Sending data to the kernel");
+
+    file_desc = open(DEVICE_PATH, O_RDWR);
+    if (file_desc < 0) {
+        log_error("Can't open device file: %s, error:%d\n", DEVICE_PATH, file_desc);
+        exit(EXIT_FAILURE);
+    }
+    ret_val = ioctl_set_msg(file_desc, data);
+    if (ret_val){
+        log_error("ioctl_set_msg failed:%d\n", ret_val);
+        close(file_desc);
+        exit(EXIT_FAILURE);
+    }
+
+    close(file_desc);
+    return 0; 
+
+}
+
+char* dump_data(char* data){
+    char tmpbuf[128];
+    snprintf(data, BUF_SIZE, "%d,", vector_get_size(vector));
+    for(int i = 0; i < vector_get_size(vector); i++){
+        ip *tmpip = vector_at(vector, i);
+        snprintf(tmpbuf, BUF_SIZE, "%s,%d,%s,", tmpip->address, tmpip->port, tmpip->protocol);
+        strcat(data, tmpbuf);
+    }
+
+    return data;
+}
+
+
+
+void dump_to_module(){
+    char data[BUF_SIZE];
+    dump_data(data);
+    ioctl_func(data);
+}
+
 void backup_shutdown(){
     log_trace("shotdown back up started");
     FILE *file = fopen(BACKUP_FILE, "w");
@@ -78,6 +137,9 @@ void backup_start(){
         }
         vector = vector_push_back(vector, &tmpip);
     }
+
+
+    dump_to_module();
 
     fclose(file);
     log_trace("vector backed up");
@@ -207,6 +269,50 @@ int create_socket()
     return socket_fd;
 }
 
+// int ioctl_get_msg(int file_desc) 
+// { 
+//     int ret_val; 
+//     char message[100] = { 0 }; 
+ 
+//     /* Warning - this is dangerous because we don't tell  
+//    * the kernel how far it's allowed to write, so it  
+//    * might overflow the buffer. In a real production  
+//    * program, we would have used two ioctls - one to tell 
+//    * the kernel the buffer length and another to give  
+//    * it the buffer to fill 
+//    */ 
+//     ret_val = ioctl(file_desc, IOCTL_GET_MSG, message); 
+ 
+//     if (ret_val < 0) { 
+//         printf("ioctl_get_msg failed:%d\n", ret_val); 
+//     } 
+//     printf("get_msg message:%s", message); 
+ 
+//     return ret_val; 
+// } 
+ 
+// int ioctl_get_nth_byte(int file_desc) 
+// { 
+//     int i, c; 
+ 
+//     printf("get_nth_byte message:"); 
+ 
+//     i = 0; 
+//     do { 
+//         c = ioctl(file_desc, IOCTL_GET_NTH_BYTE, i++); 
+ 
+//         if (c < 0) { 
+//             printf("\nioctl_get_nth_byte failed at the %d'th byte:\n", i); 
+//             return c; 
+//         } 
+ 
+//         putchar(c); 
+//     } while (c != 0); 
+ 
+//     return 0; 
+// } 
+
+
 void execute_command(daemon_command command, char* response, ssize_t *command_len){
     switch (command.command_type)
     {
@@ -215,12 +321,13 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
         vector = vector_push_back(vector, &tmpip);
         snprintf(response, BUF_SIZE, "Successfully added IP: Address: %s, Port: %d, Protocol: %s\n" ,\
             command.ip_info.address, command.ip_info.port, command.ip_info.protocol);
+        dump_to_module();
         break;
     case del:
         int delete_index = command.ip_info.port;
-	vector_erase(vector, delete_index);
-            
+	    vector_erase(vector, delete_index);
         snprintf(response, BUF_SIZE, "Successfully deleted IP with index %d\n", delete_index);
+        dump_to_module();
         break;
     case show:
         snprintf(response, BUF_SIZE, "All IPs:\n" );
@@ -243,7 +350,8 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
         snprintf(response, BUF_SIZE, "Unknown command\n" );
         break;
     }
-    //log_trace(response);
+
+
     *command_len = strlen(response);
     return;
 }
@@ -260,103 +368,6 @@ FILE *set_log_levels(){
 
     log_trace("initialized log levels");
     return fp;
-}
-
-/* Functions for the ioctl calls */ 
- 
-int ioctl_set_msg(int file_desc, char *message) 
-{ 
-    int ret_val; 
- 
-    ret_val = ioctl(file_desc, IOCTL_SET_MSG, message); 
- 
-    if (ret_val < 0) { 
-        printf("ioctl_set_msg failed:%d\n", ret_val); 
-    } 
- 
-    return ret_val; 
-} 
- 
-int ioctl_get_msg(int file_desc) 
-{ 
-    int ret_val; 
-    char message[100] = { 0 }; 
- 
-    /* Warning - this is dangerous because we don't tell  
-   * the kernel how far it's allowed to write, so it  
-   * might overflow the buffer. In a real production  
-   * program, we would have used two ioctls - one to tell 
-   * the kernel the buffer length and another to give  
-   * it the buffer to fill 
-   */ 
-    ret_val = ioctl(file_desc, IOCTL_GET_MSG, message); 
- 
-    if (ret_val < 0) { 
-        printf("ioctl_get_msg failed:%d\n", ret_val); 
-    } 
-    printf("get_msg message:%s", message); 
- 
-    return ret_val; 
-} 
- 
-int ioctl_get_nth_byte(int file_desc) 
-{ 
-    int i, c; 
- 
-    printf("get_nth_byte message:"); 
- 
-    i = 0; 
-    do { 
-        c = ioctl(file_desc, IOCTL_GET_NTH_BYTE, i++); 
- 
-        if (c < 0) { 
-            printf("\nioctl_get_nth_byte failed at the %d'th byte:\n", i); 
-            return c; 
-        } 
- 
-        putchar(c); 
-    } while (c != 0); 
- 
-    return 0; 
-} 
-
-int ioctl_func(){
-	
-    int file_desc, ret_val;
-    char *msg = "Message passed by ioctl\n";
-    
-    log_trace("before opening file");
-
-    file_desc = open(DEVICE_PATH, O_RDWR);
-    if (file_desc < 0) {
-	log_trace("cant open");
-        printf("Can't open device file: %s, error:%d\n", DEVICE_PATH,
-               file_desc);
-        exit(EXIT_FAILURE);
-    }
-    log_trace("device is opened successsss");
-    ret_val = ioctl_set_msg(file_desc, msg);
-    if (ret_val){
-	log_trace("error 2");
-        goto error;
-    }
-    ret_val = ioctl_get_nth_byte(file_desc);
-    if (ret_val){
-	log_trace("error 3");
-        goto error;
-    }
-    ret_val = ioctl_get_msg(file_desc);
-    if (ret_val){
-	log_trace("error 4");
-        goto error;
-    }
-
-    close(file_desc);
-    return 0;
-error:
-    close(file_desc);
-    exit(EXIT_FAILURE);
-
 }
 
 
@@ -388,9 +399,6 @@ int main()
         }
 
         execute_command(command, response, &command_bytes);
-
-//	ioctl_func();
-
 
         if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){
             log_error("response could not be sent properly");

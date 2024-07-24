@@ -19,7 +19,7 @@
 #include "chardev.h" 
 #define SUCCESS 0 
 #define DEVICE_NAME "char_dev" 
-#define BUF_LEN 80 
+#define BUF_LEN 1024 
  
 enum { 
     CDEV_NOT_USED = 0, 
@@ -102,8 +102,9 @@ static ssize_t device_write(struct file *file, const char __user *buffer,
                             size_t length, loff_t *offset) 
 { 
     int i; 
- 
-    pr_info("device_write(%p,%p,%ld)", file, buffer, length); 
+    
+    pr_info("device_write(%p,%s,%ld)", file, buffer, length);
+    //pr_info("device_write(%p,%p,%ld)", file, buffer, length); 
  
     for (i = 0; i < length && i < BUF_LEN; i++) 
         get_user(message[i], buffer + i); 
