@@ -15,7 +15,7 @@
 void help_usage(){
     printf("Usage: cli [OPTIONS] [ARGUMENTS]\n");
     printf("OPTIONS:\n");
-    printf("\t-a: Add student\n");
+    printf("\t-a: Add \n");
     printf("\t-d: Delete with ID\n");
     printf("\t-s: Search\n");
     printf("ARGUMENTS:\n");
@@ -89,19 +89,19 @@ int main(int argc, char *argv[])
                 break;
             case 'a':
                 command.command_type = add;
-                command.student_info = parse_student_info(optarg);
+                command.ip_info = parse_ip_info(optarg);
                 break;
             case 'd':
                 command.command_type = del;
-                command.student_info = (student){" ", atoi(optarg), 0};
+                command.ip_info = (ip){" ", atoi(optarg), ""};
                 break;
             case 's':
                 command.command_type = show;
-                command.student_info = (student){" ", 0, 0};
+                command.ip_info = (ip){" ", 0, ""};
                 break;
             case 't':
                 command.command_type = terminate;
-                command.student_info = (student){" ", 0, 0};
+                command.ip_info = (ip){" ", 0, ""};
                 break;
             case 'l':
                 command.command_type = chlog;

@@ -12,13 +12,15 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/un.h>
+#include <sys/ioctl.h> 
 
 #include "../c_vector.h"
 #include "../common.h"
 #include "log.h"
+#include "../chardev.h"
 
-static const char *LOG_FILE = "/home/baranbolo/Desktop/platform_i/daemon.log";
-static const char *BACKUP_FILE = "/home/baranbolo/Desktop/platform_i/backup.log";
+static const char *LOG_FILE = "/home/ahmet/work/airties/daemon/platform_i/daemon.log";
+static const char *BACKUP_FILE = "/home/ahmet/work/airties/daemon/platform_i/backup.log";
 
 #define SV_SOCK_PATH "/tmp/ud_ucase"
 #define BUF_SIZE 1024
@@ -34,8 +36,8 @@ void backup_shutdown(){
 
     fprintf(file, "%d\n", vector_get_size(vector));
     for(int i = 0; i < vector_get_size(vector); i++){
-        student *tmpstd = vector_at(vector, i);
-        fprintf(file, "%s,%d,%f\n", tmpstd->name, tmpstd->id, tmpstd->grade);
+        ip *tmpip = vector_at(vector, i);
+        fprintf(file, "%s,%d,%s\n", tmpip->address, tmpip->port, tmpip->protocol);
     }
     vector_free(vector);
     log_trace("vector freed");
@@ -62,14 +64,14 @@ void backup_start(){
     }
 
     int readed_number;
-    student tmpstd;
+    ip tmpip;
     for(int i = 0; i < vector_size; i++){
-        readed_number = fscanf(file, "%[^,],%d,%f\n", tmpstd.name, &tmpstd.id, &tmpstd.grade);
+        readed_number = fscanf(file, "%[^,],%d,%s\n", tmpip.address, &tmpip.port, tmpip.protocol);
         if(readed_number != 3){
             log_warn("Unexpected backup style");
             break;
         }
-        vector = vector_push_back(vector, &tmpstd);
+        vector = vector_push_back(vector, &tmpip);
     }
 
     fclose(file);
@@ -147,14 +149,14 @@ static void skeleton_daemon()
     }
     log_trace("file descriptors of daemon are closed");
 
-    int fd = open("/dev/null", O_RDWR); /* 0,1,2 file desciptors are pointed to null, so functions using stdin or stdout does not generate error */
+    int fd = open("/dev/null", O_RDWR); /* 0,1,2 file desciptors are pointed to null, so functions using in or stdout does not generate error */
     if (fd != STDIN_FILENO)             /* 'fd' should be 0 */
         exit(EXIT_FAILURE);
     if (dup2(STDIN_FILENO, STDOUT_FILENO) != STDOUT_FILENO)
         exit(EXIT_FAILURE);
     if (dup2(STDIN_FILENO, STDERR_FILENO) != STDERR_FILENO)
         exit(EXIT_FAILURE);
-    log_trace("stdin stdout and stderr is mapped to dev/null");
+    log_trace("in stdout and stderr is mapped to dev/null");
     log_trace("Daemon is successfully created");
     return;
 }
@@ -204,27 +206,23 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
     switch (command.command_type)
     {
     case add:
-        student tmpstd = command.student_info;
-        vector = vector_push_back(vector, &tmpstd);
-        snprintf(response, BUF_SIZE, "Successfully added student: Name: %s, ID: %d, Grade: %f\n" ,\
-            command.student_info.name, command.student_info.id, command.student_info.grade);
+        ip tmpip = command.ip_info;
+        vector = vector_push_back(vector, &tmpip);
+        snprintf(response, BUF_SIZE, "Successfully added IP: Address: %s, Port: %d, Protocol: %s\n" ,\
+            command.ip_info.address, command.ip_info.port, command.ip_info.protocol);
         break;
     case del:
-        int delete_id = command.student_info.id;
-        for(int i = vector_get_size(vector) - 1; i >= 0; i--){
-            student *tmpstd = vector_at(vector, i);
-            if(tmpstd->id == delete_id){
-                vector_erase(vector, i);
-            }
-        }
-        snprintf(response, BUF_SIZE, "Successfully deleted student with id %d\n", delete_id);
+        int delete_index = command.ip_info.port;
+	vector_erase(vector, delete_index);
+            
+        snprintf(response, BUF_SIZE, "Successfully deleted IP with index %d\n", delete_index);
         break;
     case show:
-        snprintf(response, BUF_SIZE, "All students:\n" );
+        snprintf(response, BUF_SIZE, "All IPs:\n" );
         for(int i = 0; i < vector_get_size(vector); i++){
-            student *tmpstd = vector_at(vector, i);
+            ip *tmpip = vector_at(vector, i);
             char tmpbuf[BUF_SIZE];
-            snprintf(tmpbuf, BUF_SIZE, "Name: %s, ID: %d, Grade: %f\n", tmpstd->name, tmpstd->id, tmpstd->grade);
+            snprintf(tmpbuf, BUF_SIZE, "Index: %d, Address: %s, Port: %d, Protocol: %s\n", i, tmpip->address, tmpip->port, tmpip->protocol);
             strcat(response, tmpbuf);
         }
         break;
@@ -259,6 +257,104 @@ FILE *set_log_levels(){
     return fp;
 }
 
+/* Functions for the ioctl calls */ 
+ 
+int ioctl_set_msg(int file_desc, char *message) 
+{ 
+    int ret_val; 
+ 
+    ret_val = ioctl(file_desc, IOCTL_SET_MSG, message); 
+ 
+    if (ret_val < 0) { 
+        printf("ioctl_set_msg failed:%d\n", ret_val); 
+    } 
+ 
+    return ret_val; 
+} 
+ 
+int ioctl_get_msg(int file_desc) 
+{ 
+    int ret_val; 
+    char message[100] = { 0 }; 
+ 
+    /* Warning - this is dangerous because we don't tell  
+   * the kernel how far it's allowed to write, so it  
+   * might overflow the buffer. In a real production  
+   * program, we would have used two ioctls - one to tell 
+   * the kernel the buffer length and another to give  
+   * it the buffer to fill 
+   */ 
+    ret_val = ioctl(file_desc, IOCTL_GET_MSG, message); 
+ 
+    if (ret_val < 0) { 
+        printf("ioctl_get_msg failed:%d\n", ret_val); 
+    } 
+    printf("get_msg message:%s", message); 
+ 
+    return ret_val; 
+} 
+ 
+int ioctl_get_nth_byte(int file_desc) 
+{ 
+    int i, c; 
+ 
+    printf("get_nth_byte message:"); 
+ 
+    i = 0; 
+    do { 
+        c = ioctl(file_desc, IOCTL_GET_NTH_BYTE, i++); 
+ 
+        if (c < 0) { 
+            printf("\nioctl_get_nth_byte failed at the %d'th byte:\n", i); 
+            return c; 
+        } 
+ 
+        putchar(c); 
+    } while (c != 0); 
+ 
+    return 0; 
+} 
+
+int ioctl_func(){
+	
+    int file_desc, ret_val;
+    char *msg = "Message passed by ioctl\n";
+    
+    log_trace("before opening file");
+
+    file_desc = open(DEVICE_PATH, O_RDWR);
+    if (file_desc < 0) {
+	log_trace("cant open");
+        printf("Can't open device file: %s, error:%d\n", DEVICE_PATH,
+               file_desc);
+        exit(EXIT_FAILURE);
+    }
+    log_trace("device is opened successsss");
+    ret_val = ioctl_set_msg(file_desc, msg);
+    if (ret_val){
+	log_trace("error 2");
+        goto error;
+    }
+    ret_val = ioctl_get_nth_byte(file_desc);
+    if (ret_val){
+	log_trace("error 3");
+        goto error;
+    }
+    ret_val = ioctl_get_msg(file_desc);
+    if (ret_val){
+	log_trace("error 4");
+        goto error;
+    }
+
+    close(file_desc);
+    return 0;
+error:
+    close(file_desc);
+    exit(EXIT_FAILURE);
+
+}
+
+
 int main()
 {
     skeleton_daemon();
@@ -268,7 +364,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    vector = vector_initialize(vector, sizeof(student), NULL);
+    vector = vector_initialize(vector, sizeof(ip), NULL);
     log_trace("Vector is initialized");
     backup_start();
 
@@ -287,6 +383,9 @@ int main()
         }
 
         execute_command(command, response, &command_bytes);
+
+//	ioctl_func();
+
 
         if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){
             log_error("response could not be sent properly");

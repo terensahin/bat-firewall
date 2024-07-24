@@ -1,11 +1,11 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-typedef struct student{
-    char name[100];
-    int id;
-    float grade;
-}student;
+typedef struct ip{
+    char address[100];
+    int port;
+    char protocol[4];
+}ip;
 
 typedef enum command{
     add,
@@ -17,14 +17,14 @@ typedef enum command{
 
 typedef struct daemon_command{
     command command_type;
-    student student_info;
+    ip ip_info;
     int log_level;
 }daemon_command;
 
-student create_student(char* name, int id, float grade);
-void free_student(student student);
-daemon_command create_daemon_command(command command_type, char* name, int id, float grade);
-void print_student_info(student student);
-student parse_student_info(char* input);
+ip create_ip(char* address, int port, char* protocol);
+
+daemon_command create_daemon_command(command command_type, char* address, int port, char* protocol);
+void print_ip_info(ip ip);
+ip parse_ip_info(char* input);
 
 #endif
