@@ -19,8 +19,8 @@
 #include "log.h"
 #include "../chardev.h"
 
-static const char *LOG_FILE = "/home/ahmet/work/airties/daemon/platform_i/daemon.log";
-static const char *BACKUP_FILE = "/home/ahmet/work/airties/daemon/platform_i/backup.log";
+static const char *LOG_FILE = "/home/terensahin/Desktop/daemon.log";
+static const char *BACKUP_FILE = "/home/terensahin/Desktop/backup.log";
 
 #define SV_SOCK_PATH "/tmp/ud_ucase"
 #define BUF_SIZE 1024
@@ -44,6 +44,11 @@ void backup_shutdown(){
     fclose(file);
     log_trace("log file is closed");
     fclose(logfp);
+}
+
+void sigterm_handler(int sig){
+    backup_shutdown();
+    exit(EXIT_FAILURE);
 }
 
 /*  
@@ -115,7 +120,7 @@ static void skeleton_daemon()
 
     sigemptyset(&sa.sa_mask); /* Set handler for SIGTERM signal (backup on shutdown) */
     sa.sa_flags = SA_RESTART;
-    sa.sa_handler = backup_shutdown;
+    sa.sa_handler = sigterm_handler;
     if (sigaction(SIGTERM, &sa, NULL) == -1) {
         log_error("error sigaction 3");
         exit(EXIT_FAILURE);
