@@ -14,80 +14,15 @@
 #include <sys/un.h>
 #include <sys/ioctl.h> 
 
+#include "aird.h"
 #include "../c_vector.h"
 #include "../common.h"
 #include "log.h"
 #include "../chardev.h"
 
-static const char *LOG_FILE = "/home/terensahin/Desktop/daemon.log";
-static const char *BACKUP_FILE = "/home/terensahin/Desktop/backup.log";
-
-#define SV_SOCK_PATH "/tmp/ud_ucase"
-#define BUF_SIZE 1024
-#define BACKLOG 5
-#define MAXIMUM_MESSAGE_COUNT 10
-
 FILE *logfp;
 int *vector;
 
-
-/* Functions for the ioctl calls */ 
- 
-int ioctl_set_msg(int file_desc, char *message) 
-{ 
-    int ret_val; 
- 
-    ret_val = ioctl(file_desc, IOCTL_SET_MSG, message); 
- 
-    if (ret_val < 0) { 
-        printf("ioctl_set_msg failed:%d\n", ret_val); 
-    } 
- 
-    return ret_val; 
-}
-
-int ioctl_func(char* data){
-	
-    int file_desc, ret_val;
-    
-    log_trace("Sending data to the kernel");
-
-    file_desc = open(DEVICE_PATH, O_RDWR);
-    if (file_desc < 0) {
-        log_error("Can't open device file: %s, error:%d\n", DEVICE_PATH, file_desc);
-        exit(EXIT_FAILURE);
-    }
-    ret_val = ioctl_set_msg(file_desc, data);
-    if (ret_val){
-        log_error("ioctl_set_msg failed:%d\n", ret_val);
-        close(file_desc);
-        exit(EXIT_FAILURE);
-    }
-
-    close(file_desc);
-    return 0; 
-
-}
-
-char* dump_data(char* data){
-    char tmpbuf[128];
-    snprintf(data, BUF_SIZE, "%d,", vector_get_size(vector));
-    for(int i = 0; i < vector_get_size(vector); i++){
-        ip *tmpip = vector_at(vector, i);
-        snprintf(tmpbuf, BUF_SIZE, "%s,%d,%s,", tmpip->address, tmpip->port, tmpip->protocol);
-        strcat(data, tmpbuf);
-    }
-
-    return data;
-}
-
-
-
-void dump_to_module(){
-    char data[BUF_SIZE];
-    dump_data(data);
-    ioctl_func(data);
-}
 
 void backup_shutdown(){
     log_trace("shotdown back up started");
@@ -146,8 +81,62 @@ void backup_start(){
     return;
 }
 
-static void skeleton_daemon()
+void dump_to_module(){
+    char data[BUF_SIZE];
+    dump_data(data);
+    ioctl_func(data);
+}
+
+/* Functions for the ioctl calls */ 
+int ioctl_set_msg(int file_desc, char *message)
 {
+    int ret_val;
+ 
+    ret_val = ioctl(file_desc, IOCTL_SET_MSG, message);
+ 
+    if (ret_val < 0) {
+        printf("ioctl_set_msg failed:%d\n", ret_val); 
+    }
+ 
+    return ret_val;
+}
+
+int ioctl_func(char* data){
+	
+    int file_desc, ret_val;
+    
+    log_trace("Sending data to the kernel");
+
+    file_desc = open(DEVICE_PATH, O_RDWR);
+    if (file_desc < 0) {
+        log_error("Can't open device file: %s, error:%d\n", DEVICE_PATH, file_desc);
+        exit(EXIT_FAILURE);
+    }
+    ret_val = ioctl_set_msg(file_desc, data);
+    if (ret_val){
+        log_error("ioctl_set_msg failed:%d\n", ret_val);
+        close(file_desc);
+        exit(EXIT_FAILURE);
+    }
+
+    close(file_desc);
+    return 0; 
+
+}
+
+char* dump_data(char* data){
+    char tmpbuf[128];
+    snprintf(data, BUF_SIZE, "%d,", vector_get_size(vector));
+    for(int i = 0; i < vector_get_size(vector); i++){
+        ip *tmpip = vector_at(vector, i);
+        snprintf(tmpbuf, BUF_SIZE, "%s,%d,%s,", tmpip->address, tmpip->port, tmpip->protocol);
+        strcat(data, tmpbuf);
+    }
+
+    return data;
+}
+
+static void skeleton_daemon(){
     pid_t pid; /* Used pid_t for portability */
 
     pid = fork(); /* This fork is to leave from process group */
@@ -228,8 +217,7 @@ static void skeleton_daemon()
     return;
 }
 
-int create_socket()
-{
+int create_socket(){
     struct sockaddr_un socket_address;
     int socket_fd;
 
