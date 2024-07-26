@@ -13,6 +13,13 @@
 #include <linux/types.h> 
 #include <linux/uaccess.h> /* for get_user and put_user */ 
 #include <linux/version.h> 
+#include <linux/netfilter.h>
+#include <linux/netfilter_ipv4.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/udp.h>
+#include <linux/string.h>
+
  
 #include <asm/errno.h> 
  
@@ -35,6 +42,8 @@ static atomic_t already_open = ATOMIC_INIT(CDEV_NOT_USED);
 static char message[BUF_LEN + 1]; 
  
 static struct class *cls; 
+
+static struct nf_hook_ops *nfho = NULL;
  
 /* This is called whenever a process attempts to open the device file */ 
 static int device_open(struct inode *inode, struct file *file) 
@@ -193,6 +202,93 @@ static struct file_operations fops = {
     .open = device_open, 
     .release = device_release, /* a.k.a. close */ 
 }; 
+
+
+static int isBlocked(int port, uint32_t address, char* protocol){
+
+    char *tmp_msg = message;
+    char *token1;
+    char *token2;
+    char *token3;
+    long size;
+    long tmp_port;
+    uint8_t tmp_ip[4];
+    uint32_t addr;
+    int i;
+
+    kstrtol(strsep(&tmp_msg, ","), 10, &size);
+
+    for(i = 0; i < size; i++){
+
+        token1 = strsep(&tmp_msg, ",");
+        token2 = strsep(&tmp_msg, ",");
+        token3 = strsep(&tmp_msg, ",");
+
+        in4_pton(token1, -1, tmp_ip, -1, NULL);
+        addr = (tmp_ip[0] << 24) | (tmp_ip[1] << 16) | (tmp_ip[2] << 8) | tmp_ip[3];
+
+        if(addr != address)
+            continue;
+
+        kstrtol(token2, 10, &tmp_port);
+
+        if(port != tmp_port)
+            continue;
+
+        if(strncmp(protocol, token3, 3) != 0)
+            continue;
+
+        return 1;
+    }
+    
+    return 0;
+
+}
+
+static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
+{
+    struct iphdr *ip_header;
+    struct tcphdr *tcp_header;
+    struct udphdr *udp_header;
+    uint32_t src_ip_address;
+    if (!skb)
+        return NF_ACCEPT;
+
+    ip_header = ip_hdr(skb);
+	
+    
+    src_ip_address = ntohl(ip_header->saddr);
+
+    if (ip_header->protocol == IPPROTO_TCP) {
+
+        printk(KERN_INFO "TCP packet detected!\n");
+        tcp_header = (struct tcphdr *) skb_transport_header(skb);
+
+        if(isBlocked(ntohs(tcp_header->dest), src_ip_address, "tcp") == 0)
+            return NF_ACCEPT;
+	      
+
+    }else if (ip_header->protocol == IPPROTO_UDP) {
+        printk(KERN_INFO "UDP packet detected!\n");
+	    
+        if(isBlocked(ntohs(udp_header->dest), src_ip_address, "udp") == 0)
+            return NF_ACCEPT;
+                /**
+                 * If the packet is destined to 53 port then only accept
+                 */
+		udp_header = udp_hdr(skb);
+		if (ntohs(udp_header->dest) == 53)
+			return NF_ACCEPT;
+	}
+        /**
+         * Rest all type of connections are dropped
+        */
+    return NF_DROP;
+}
+
+
+
+
  
 /* Initialize the module - Register the character device */ 
 static int __init chardev2_init(void) 
@@ -215,6 +311,18 @@ static int __init chardev2_init(void)
     device_create(cls, NULL, MKDEV(MAJOR_NUM, 0), NULL, DEVICE_FILE_NAME); 
  
     pr_info("Device created on /dev/%s\n", DEVICE_FILE_NAME); 
+
+
+    nfho = (struct nf_hook_ops*)kcalloc(1, sizeof(struct nf_hook_ops), GFP_KERNEL);
+    
+    /* Initialize netfilter hook */
+    nfho->hook  = (nf_hookfn*)hfunc;        /* hook function */
+    nfho->hooknum   = NF_INET_PRE_ROUTING;      /* received packets */
+    nfho->pf    = PF_INET;          /* IPv4 */
+    nfho->priority  = NF_IP_PRI_FIRST;      /* max hook priority */
+    
+    nf_register_net_hook(&init_net, nfho);
+
  
     return 0; 
 } 
@@ -227,6 +335,9 @@ static void __exit chardev2_exit(void)
  
     /* Unregister the device */ 
     unregister_chrdev(MAJOR_NUM, DEVICE_NAME); 
+
+    nf_unregister_net_hook(&init_net, nfho);
+    kfree(nfho);
 } 
  
 module_init(chardev2_init); 
