@@ -19,6 +19,7 @@
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/string.h>
+#include <linux/inet.h>
 
  
 #include <asm/errno.h> 
@@ -214,28 +215,55 @@ static int isBlocked(int port, uint32_t address, char* protocol){
     long tmp_port;
     uint8_t tmp_ip[4];
     uint32_t addr;
+    char *savePtr;
     int i;
 
-    kstrtol(strsep(&tmp_msg, ","), 10, &size);
+    pr_info("BEFORE: %s\n", tmp_msg);
+
+    if (kstrtol(strtok_r(tmp_msg, ",", &savePtr), 10, &size) != 0)
+        return 0;
+    message[1] = ',';
+
+    pr_info("AFTER: %s\n", tmp_msg);
 
     for(i = 0; i < size; i++){
 
-        token1 = strsep(&tmp_msg, ",");
-        token2 = strsep(&tmp_msg, ",");
-        token3 = strsep(&tmp_msg, ",");
+        token1 = strtok_r(NULL, ",", &savePtr);
+        token2 = strtok_r(NULL, ",", &savePtr);
+        token3 = strtok_r(NULL, ",", &savePtr);
 
-        in4_pton(token1, -1, tmp_ip, -1, NULL);
+        if (token1 == NULL){
+            pr_info("ERROR TOKEN1\n");
+            return 0;
+        }
+        if (token2 == NULL){
+            pr_info("ERROR TOKEN2\n");
+            return 0;
+        }
+        if (token3 == NULL){
+            pr_info("ERROR TOKEN3\n");
+            return 0;
+        }
+
+        if(in4_pton(token1, -1, tmp_ip, -1, NULL) <= 0){
+            
+            pr_info("INT4 PTON ERROR\n");
+            return 0;
+        }
+
+        
         addr = (tmp_ip[0] << 24) | (tmp_ip[1] << 16) | (tmp_ip[2] << 8) | tmp_ip[3];
 
-        if(addr != address)
+        if (addr != address)
             continue;
 
-        kstrtol(token2, 10, &tmp_port);
+        if (kstrtol(token2, 10, &tmp_port) != 0)
+            return 0;
 
-        if(port != tmp_port)
+        if (port != tmp_port)
             continue;
 
-        if(strncmp(protocol, token3, 3) != 0)
+        if (strncmp(protocol, token3, 3) != 0)
             continue;
 
         return 1;
@@ -256,34 +284,32 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 
     ip_header = ip_hdr(skb);
 	
-    
     src_ip_address = ntohl(ip_header->saddr);
 
+    pr_info("SOURCE IP ADDRESS%d\n", src_ip_address); 
     if (ip_header->protocol == IPPROTO_TCP) {
 
         printk(KERN_INFO "TCP packet detected!\n");
         tcp_header = (struct tcphdr *) skb_transport_header(skb);
 
-        if(isBlocked(ntohs(tcp_header->dest), src_ip_address, "tcp") == 0)
+        if (isBlocked(ntohs(tcp_header->dest), src_ip_address, "tcp") == 1){
+            pr_info("tcp dropped\n"); 
             return NF_ACCEPT;
-	      
+        } 
 
     }else if (ip_header->protocol == IPPROTO_UDP) {
         printk(KERN_INFO "UDP packet detected!\n");
-	    
-        if(isBlocked(ntohs(udp_header->dest), src_ip_address, "udp") == 0)
+        
+	    udp_header = udp_hdr(skb);
+        if (isBlocked(ntohs(udp_header->dest), src_ip_address, "udp") == 1){
+            pr_info("udp dropped\n");
             return NF_ACCEPT;
-                /**
-                 * If the packet is destined to 53 port then only accept
-                 */
-		udp_header = udp_hdr(skb);
-		if (ntohs(udp_header->dest) == 53)
-			return NF_ACCEPT;
+        }
+		
 	}
-        /**
-         * Rest all type of connections are dropped
-        */
-    return NF_DROP;
+    
+    pr_info("packet accepted\n");
+    return NF_ACCEPT;
 }
 
 
