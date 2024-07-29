@@ -89,19 +89,19 @@ int main(int argc, char *argv[])
                 break;
             case 'a':
                 command.command_type = add;
-                command.ip_info = parse_ip_info(optarg);
+                command.rule_info = parse_ip_info(optarg);
                 break;
             case 'd':
                 command.command_type = del;
-                command.ip_info = (ip){" ", atoi(optarg), ""};
+                command.rule_info = (firewall_rule){" ", atoi(optarg), ""};
                 break;
             case 's':
                 command.command_type = show;
-                command.ip_info = (ip){" ", 0, ""};
+                command.rule_info = (firewall_rule){" ", 0, ""};
                 break;
             case 't':
                 command.command_type = terminate;
-                command.ip_info = (ip){" ", 0, ""};
+                command.rule_info = (firewall_rule){" ", 0, ""};
                 break;
             case 'l':
                 command.command_type = chlog;

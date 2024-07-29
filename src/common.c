@@ -3,8 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-ip create_ip(char* address, int port, char* protocol){
-    ip new_ip;
+firewall_rule create_ip(char* address, int port, char* protocol){
+    firewall_rule new_ip;
     strcpy(new_ip.address, address);
     new_ip.port = port;
     strcpy(new_ip.protocol, protocol);
@@ -15,11 +15,11 @@ ip create_ip(char* address, int port, char* protocol){
 daemon_command create_daemon_command(command command_type, char* address, int port, char* protocol){
     daemon_command new_daemon_command;
     new_daemon_command.command_type = command_type;
-    new_daemon_command.ip_info = create_ip(address, port, protocol);
+    new_daemon_command.rule_info = create_ip(address, port, protocol);
     return new_daemon_command;
 }
 
-ip parse_ip_info(char* input) {
+firewall_rule parse_ip_info(char* input) {
     if (input == NULL) {
         fprintf(stderr, "Error: Input string is NULL\n");
         return create_ip("", -1, ""); // or an appropriate error value for your use case

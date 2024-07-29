@@ -21,7 +21,7 @@
 #include "../chardev.h"
 
 FILE *logfp;
-ip *vector;
+firewall_rule *vector;
 
 
 void backup_shutdown(){
@@ -30,8 +30,8 @@ void backup_shutdown(){
 
     fprintf(file, "%d\n", vector_get_size(vector));
     for(int i = 0; i < vector_get_size(vector); i++){
-        ip *tmpip = vector_at(vector, i);
-        fprintf(file, "%s,%d,%s\n", tmpip->address, tmpip->port, tmpip->protocol);
+        firewall_rule *tmprule = vector_at(vector, i);
+        fprintf(file, "%s,%d,%s\n", tmprule->address, tmprule->port, tmprule->protocol);
     }
     vector_free(vector);
     log_trace("vector freed");
@@ -63,28 +63,22 @@ void backup_start(){
     }
 
     int readed_number;
-    ip tmpip;
+    firewall_rule tmprule;
     for(int i = 0; i < vector_size; i++){
-        readed_number = fscanf(file, "%[^,],%d,%s\n", tmpip.address, &tmpip.port, tmpip.protocol);
+        readed_number = fscanf(file, "%[^,],%d,%s\n", tmprule.address, &tmprule.port, tmprule.protocol);
         if(readed_number != 3){
             log_warn("Unexpected backup style");
             break;
         }
-        vector = vector_push_back(vector, &tmpip);
+        vector = vector_push_back(vector, &tmprule);
     }
 
 
-    dump_to_module();
+    ioctl_func();
 
     fclose(file);
     log_trace("vector backed up");
     return;
-}
-
-void dump_to_module(){
-    // char data[BUF_SIZE];
-    // dump_data(data);
-    ioctl_func();
 }
 
 /* Functions for the ioctl calls */ 
@@ -123,18 +117,6 @@ int ioctl_func(){
     return 0; 
 
 }
-
-// char* dump_data(char* data){
-//     char tmpbuf[128];
-//     snprintf(data, BUF_SIZE, "%d,", vector_get_size(vector));
-//     for(int i = 0; i < vector_get_size(vector); i++){
-//         ip *tmpip = vector_at(vector, i);
-//         snprintf(tmpbuf, BUF_SIZE, "%s,%d,%s,", tmpip->address, tmpip->port, tmpip->protocol);
-//         strcat(data, tmpbuf);
-//     }
-
-//     return data;
-// }
 
 static void skeleton_daemon(){
     pid_t pid; /* Used pid_t for portability */
@@ -257,72 +239,28 @@ int create_socket(){
     return socket_fd;
 }
 
-// int ioctl_get_msg(int file_desc) 
-// { 
-//     int ret_val; 
-//     char message[100] = { 0 }; 
- 
-//     /* Warning - this is dangerous because we don't tell  
-//    * the kernel how far it's allowed to write, so it  
-//    * might overflow the buffer. In a real production  
-//    * program, we would have used two ioctls - one to tell 
-//    * the kernel the buffer length and another to give  
-//    * it the buffer to fill 
-//    */ 
-//     ret_val = ioctl(file_desc, IOCTL_GET_MSG, message); 
- 
-//     if (ret_val < 0) { 
-//         printf("ioctl_get_msg failed:%d\n", ret_val); 
-//     } 
-//     printf("get_msg message:%s", message); 
- 
-//     return ret_val; 
-// } 
- 
-// int ioctl_get_nth_byte(int file_desc) 
-// { 
-//     int i, c; 
- 
-//     printf("get_nth_byte message:"); 
- 
-//     i = 0; 
-//     do { 
-//         c = ioctl(file_desc, IOCTL_GET_NTH_BYTE, i++); 
- 
-//         if (c < 0) { 
-//             printf("\nioctl_get_nth_byte failed at the %d'th byte:\n", i); 
-//             return c; 
-//         } 
- 
-//         putchar(c); 
-//     } while (c != 0); 
- 
-//     return 0; 
-// } 
-
-
 void execute_command(daemon_command command, char* response, ssize_t *command_len){
     switch (command.command_type)
     {
     case add:
-        ip tmpip = command.ip_info;
-        vector = vector_push_back(vector, &tmpip);
+        firewall_rule tmprule = command.rule_info;
+        vector = vector_push_back(vector, &tmprule);
         snprintf(response, BUF_SIZE, "Successfully added IP: Address: %s, Port: %d, Protocol: %s\n" ,\
-            command.ip_info.address, command.ip_info.port, command.ip_info.protocol);
-        dump_to_module();
+            command.rule_info.address, command.rule_info.port, command.rule_info.protocol);
+        ioctl_func();
         break;
     case del:
-        int delete_index = command.ip_info.port;
+        int delete_index = command.rule_info.port;
 	    vector_erase(vector, delete_index);
         snprintf(response, BUF_SIZE, "Successfully deleted IP with index %d\n", delete_index);
-        dump_to_module();
+        ioctl_func();
         break;
     case show:
         snprintf(response, BUF_SIZE, "All IPs:\n" );
         for(int i = 0; i < vector_get_size(vector); i++){
-            ip *tmpip = vector_at(vector, i);
+            firewall_rule *tmprule = vector_at(vector, i);
             char tmpbuf[BUF_SIZE];
-            snprintf(tmpbuf, BUF_SIZE, "Index: %d, Address: %s, Port: %d, Protocol: %s\n", i, tmpip->address, tmpip->port, tmpip->protocol);
+            snprintf(tmpbuf, BUF_SIZE, "Index: %d, Address: %s, Port: %d, Protocol: %s\n", i, tmprule->address, tmprule->port, tmprule->protocol);
             strcat(response, tmpbuf);
         }
         break;
@@ -368,7 +306,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    vector = vector_initialize(vector, sizeof(ip), NULL);
+    vector = vector_initialize(vector, sizeof(firewall_rule), NULL);
     log_trace("Vector is initialized");
     backup_start();
 

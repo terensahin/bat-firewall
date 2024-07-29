@@ -1,11 +1,11 @@
 #ifndef COMMON_H
 #define COMMON_H
 
-typedef struct ip{
+typedef struct firewall_rule{
     char address[100];
     int port;
     char protocol[4];
-}ip;
+}firewall_rule;
 
 typedef enum command{
     add,
@@ -17,14 +17,14 @@ typedef enum command{
 
 typedef struct daemon_command{
     command command_type;
-    ip ip_info;
+    firewall_rule rule_info;
     int log_level;
 }daemon_command;
 
-ip create_ip(char* address, int port, char* protocol);
+firewall_rule create_ip(char* address, int port, char* protocol);
 
 daemon_command create_daemon_command(command command_type, char* address, int port, char* protocol);
-void print_ip_info(ip ip);
-ip parse_ip_info(char* input);
+void print_ip_info(firewall_rule firewall_rule);
+firewall_rule parse_ip_info(char* input);
 
 #endif

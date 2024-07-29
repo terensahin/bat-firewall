@@ -1,14 +1,10 @@
-/* 
- * chardev2.c - Create an input/output character device 
- */ 
- 
 #include <linux/atomic.h> 
 #include <linux/cdev.h> 
 #include <linux/delay.h> 
 #include <linux/device.h> 
 #include <linux/fs.h> 
 #include <linux/init.h> 
-#include <linux/module.h> /* Specifically, a module */ 
+#include <linux/module.h>
 #include <linux/printk.h> 
 #include <linux/types.h> 
 #include <linux/uaccess.h> /* for get_user and put_user */ 
@@ -21,29 +17,23 @@
 #include <linux/string.h>
 #include <linux/inet.h>
 #include "../common.h"
-
- 
 #include <asm/errno.h> 
- 
 #include "chardev.h" 
+
 #define SUCCESS 0 
 #define DEVICE_NAME "char_dev" 
-#define BUF_LEN 1024 
  
 enum { 
     CDEV_NOT_USED = 0, 
     CDEV_EXCLUSIVE_OPEN = 1, 
 }; 
 
-ip firewall_rules[8];
+firewall_rule firewall_rules[32];
  
 /* Is the device open right now? Used to prevent concurrent access into 
  * the same device 
  */ 
 static atomic_t already_open = ATOMIC_INIT(CDEV_NOT_USED); 
- 
-/* The message the device will give when asked */ 
-static char message[BUF_LEN + 1]; 
  
 static struct class *cls; 
 
@@ -66,66 +56,6 @@ static int device_release(struct inode *inode, struct file *file)
     return SUCCESS; 
 } 
  
-/* This function is called whenever a process which has already opened the 
- * device file attempts to read from it. 
- */ 
-static ssize_t device_read(struct file *file, /* see include/linux/fs.h   */ 
-                           char __user *buffer, /* buffer to be filled  */ 
-                           size_t length, /* length of the buffer     */ 
-                           loff_t *offset) 
-{ 
-    /* Number of bytes actually written to the buffer */ 
-    int bytes_read = 0; 
-    /* How far did the process reading the message get? Useful if the message 
-     * is larger than the size of the buffer we get to fill in device_read. 
-     */ 
-    const char *message_ptr = message; 
- 
-    if (!*(message_ptr + *offset)) { /* we are at the end of message */ 
-        *offset = 0; /* reset the offset */ 
-        return 0; /* signify end of file */ 
-    } 
- 
-    message_ptr += *offset; 
- 
-    /* Actually put the data into the buffer */ 
-    while (length && *message_ptr) { 
-        /* Because the buffer is in the user data segment, not the kernel 
-         * data segment, assignment would not work. Instead, we have to 
-         * use put_user which copies data from the kernel data segment to 
-         * the user data segment. 
-         */ 
-        put_user(*(message_ptr++), buffer++); 
-        length--; 
-        bytes_read++; 
-    } 
- 
-    pr_info("Read %d bytes, %ld left\n", bytes_read, length); 
- 
-    *offset += bytes_read; 
- 
-    /* Read functions are supposed to return the number of bytes actually 
-     * inserted into the buffer. 
-     */ 
-    return bytes_read; 
-} 
- 
-/* called when somebody tries to write into our device file. */ 
-static ssize_t device_write(struct file *file, const char __user *buffer, 
-                            size_t length, loff_t *offset) 
-{ 
-    int i; 
-    
-    pr_info("device_write(%p,%s,%ld)", file, buffer, length);
-    //pr_info("device_write(%p,%p,%ld)", file, buffer, length); 
- 
-    for (i = 0; i < length && i < BUF_LEN; i++) 
-        get_user(message[i], buffer + i); 
- 
-    /* Again, return the number of input characters used. */ 
-    return i; 
-} 
- 
 /* This function is called whenever a process tries to do an ioctl on our 
  * device file. We get two extra parameters (additional to the inode and file 
  * structures, which all device functions get): the number of the ioctl called 
@@ -134,93 +64,60 @@ static ssize_t device_write(struct file *file, const char __user *buffer,
  * If the ioctl is write or read/write (meaning output is returned to the 
  * calling process), the ioctl call returns the output of this function. 
  */ 
-static long 
-device_ioctl(struct file *file, /* ditto */ 
-             unsigned int ioctl_num, /* number and param for ioctl */ 
+static long device_ioctl(struct file *file,
+             unsigned int ioctl_num, /* command */ 
              unsigned long ioctl_param) 
 { 
-    int i; 
     long ret = SUCCESS; 
  
-    /* We don't want to talk to two processes at the same time. */ 
     if (atomic_cmpxchg(&already_open, CDEV_NOT_USED, CDEV_EXCLUSIVE_OPEN)) 
         return -EBUSY; 
  
-    /* Switch according to the ioctl called */ 
     switch (ioctl_num) { 
-    case IOCTL_SET_MSG: {
-        ip __user *user_ip_ptr = (ip __user *)ioctl_param;
+        case IOCTL_SET_MSG: {
+            firewall_rule __user *user_frule_ptr = (firewall_rule __user *)ioctl_param;
 
-        if (copy_from_user(firewall_rules, user_ip_ptr, sizeof(firewall_rules))) {
-            pr_info("error COPY");
-            return -EFAULT;
+            if (copy_from_user(firewall_rules, user_frule_ptr, sizeof(firewall_rules))) {
+                pr_info("error COPY");
+                return -EFAULT;
+            }
+
+            pr_info("%s %d %s", firewall_rules[0].address, firewall_rules[0].port, firewall_rules[0].protocol);
+            pr_info("%s %d %s", firewall_rules[1].address, firewall_rules[1].port, firewall_rules[1].protocol);
+            pr_info("%s %d %s", firewall_rules[2].address, firewall_rules[2].port, firewall_rules[2].protocol);
+
+            break;
         }
-
-        pr_info("%s %d %s", firewall_rules[0].address, firewall_rules[0].port, firewall_rules[0].protocol);
-        pr_info("%s %d %s", firewall_rules[1].address, firewall_rules[1].port, firewall_rules[1].protocol);
-        pr_info("%s %d %s", firewall_rules[2].address, firewall_rules[2].port, firewall_rules[2].protocol);
-
-        break;
-    }
-    case IOCTL_GET_MSG: { 
-        loff_t offset = 0; 
- 
-        /* Give the current message to the calling process - the parameter 
-         * we got is a pointer, fill it. 
-         */ 
-        i = device_read(file, (char __user *)ioctl_param, 99, &offset); 
- 
-        /* Put a zero at the end of the buffer, so it will be properly 
-         * terminated. 
-         */ 
-        put_user('\0', (char __user *)ioctl_param + i); 
-        break; 
-    } 
-    case IOCTL_GET_NTH_BYTE: 
-        /* This ioctl is both input (ioctl_param) and output (the return 
-         * value of this function). 
-         */ 
-        ret = (long)message[ioctl_param]; 
-        break; 
     } 
  
-    /* We're now ready for our next caller */ 
     atomic_set(&already_open, CDEV_NOT_USED); 
  
     return ret; 
 } 
  
 /* Module Declarations */ 
- 
-/* This structure will hold the functions to be called when a process does 
- * something to the device we created. Since a pointer to this structure 
- * is kept in the devices table, it can't be local to init_module. NULL is 
- * for unimplemented functions. 
- */ 
 static struct file_operations fops = { 
-    .read = device_read, 
-    .write = device_write, 
     .unlocked_ioctl = device_ioctl, 
     .open = device_open, 
-    .release = device_release, /* a.k.a. close */ 
+    .release = device_release,
 }; 
 
 
 static int isBlocked(int port, uint32_t address, char* protocol){
 
-    uint8_t tmp_ip[4];
+    uint8_t tmp_addr[4];
     uint32_t addr;
 
     for(int i = 0; i < 8; i++){
 
-        pr_info("check ip: %s\n", firewall_rules[i].address);
+        pr_info("check firewall_rule: %s\n", firewall_rules[i].address);
 
-        if(in4_pton(firewall_rules[i].address, -1, tmp_ip, -1, NULL) <= 0){
+        if(in4_pton(firewall_rules[i].address, -1, tmp_addr, -1, NULL) <= 0){
             pr_info("INT4 PTON ERROR\n");
             continue;
         }
 
-        addr = (tmp_ip[0] << 24) | (tmp_ip[1] << 16) | (tmp_ip[2] << 8) | tmp_ip[3];
+        addr = (tmp_addr[0] << 24) | (tmp_addr[1] << 16) | (tmp_addr[2] << 8) | tmp_addr[3];
 
         if (addr != address){
             continue;
