@@ -20,6 +20,7 @@
 #include <linux/udp.h>
 #include <linux/string.h>
 #include <linux/inet.h>
+#include "../common.h"
 
  
 #include <asm/errno.h> 
@@ -33,6 +34,8 @@ enum {
     CDEV_NOT_USED = 0, 
     CDEV_EXCLUSIVE_OPEN = 1, 
 }; 
+
+ip firewall_rules[8];
  
 /* Is the device open right now? Used to prevent concurrent access into 
  * the same device 
@@ -145,22 +148,20 @@ device_ioctl(struct file *file, /* ditto */
  
     /* Switch according to the ioctl called */ 
     switch (ioctl_num) { 
-    case IOCTL_SET_MSG: { 
-        /* Receive a pointer to a message (in user space) and set that to 
-         * be the device's message. Get the parameter given to ioctl by 
-         * the process. 
-         */ 
-        char __user *tmp = (char __user *)ioctl_param; 
-        char ch; 
- 
-        /* Find the length of the message */ 
-        get_user(ch, tmp); 
-        for (i = 0; ch && i < BUF_LEN; i++, tmp++) 
-            get_user(ch, tmp); 
- 
-        device_write(file, (char __user *)ioctl_param, i, NULL); 
-        break; 
-    } 
+    case IOCTL_SET_MSG: {
+        ip __user *user_ip_ptr = (ip __user *)ioctl_param;
+
+        if (copy_from_user(firewall_rules, user_ip_ptr, sizeof(firewall_rules))) {
+            pr_info("error COPY");
+            return -EFAULT;
+        }
+
+        pr_info("%s %d %s", firewall_rules[0].address, firewall_rules[0].port, firewall_rules[0].protocol);
+        pr_info("%s %d %s", firewall_rules[1].address, firewall_rules[1].port, firewall_rules[1].protocol);
+        pr_info("%s %d %s", firewall_rules[2].address, firewall_rules[2].port, firewall_rules[2].protocol);
+
+        break;
+    }
     case IOCTL_GET_MSG: { 
         loff_t offset = 0; 
  
@@ -207,70 +208,36 @@ static struct file_operations fops = {
 
 static int isBlocked(int port, uint32_t address, char* protocol){
 
-    char *tmp_msg = message;
-    char *token1;
-    char *token2;
-    char *token3;
-    long size;
-    long tmp_port;
     uint8_t tmp_ip[4];
     uint32_t addr;
-    char *savePtr;
-    int i;
 
-    pr_info("BEFORE: %s\n", tmp_msg);
+    for(int i = 0; i < 8; i++){
 
-    if (kstrtol(strtok_r(tmp_msg, ",", &savePtr), 10, &size) != 0)
-        return 0;
-    message[1] = ',';
+        pr_info("check ip: %s\n", firewall_rules[i].address);
 
-    pr_info("AFTER: %s\n", tmp_msg);
-
-    for(i = 0; i < size; i++){
-
-        token1 = strtok_r(NULL, ",", &savePtr);
-        token2 = strtok_r(NULL, ",", &savePtr);
-        token3 = strtok_r(NULL, ",", &savePtr);
-
-        if (token1 == NULL){
-            pr_info("ERROR TOKEN1\n");
-            return 0;
-        }
-        if (token2 == NULL){
-            pr_info("ERROR TOKEN2\n");
-            return 0;
-        }
-        if (token3 == NULL){
-            pr_info("ERROR TOKEN3\n");
-            return 0;
-        }
-
-        if(in4_pton(token1, -1, tmp_ip, -1, NULL) <= 0){
-            
+        if(in4_pton(firewall_rules[i].address, -1, tmp_ip, -1, NULL) <= 0){
             pr_info("INT4 PTON ERROR\n");
-            return 0;
+            continue;
         }
 
-        
         addr = (tmp_ip[0] << 24) | (tmp_ip[1] << 16) | (tmp_ip[2] << 8) | tmp_ip[3];
 
-        if (addr != address)
+        if (addr != address){
             continue;
+        }
 
-        if (kstrtol(token2, 10, &tmp_port) != 0)
-            return 0;
-
-        if (port != tmp_port)
+        if (port != firewall_rules[i].port){
             continue;
+        }
 
-        if (strncmp(protocol, token3, 3) != 0)
+        if (strncmp(protocol, firewall_rules[i].protocol, 3) != 0){
             continue;
+        }
 
         return 1;
     }
     
     return 0;
-
 }
 
 static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
@@ -286,7 +253,7 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 	
     src_ip_address = ntohl(ip_header->saddr);
 
-    pr_info("SOURCE IP ADDRESS%d\n", src_ip_address); 
+    pr_info("SOURCE IP ADDRESS %d\n", src_ip_address); 
     if (ip_header->protocol == IPPROTO_TCP) {
 
         printk(KERN_INFO "TCP packet detected!\n");

@@ -21,7 +21,7 @@
 #include "../chardev.h"
 
 FILE *logfp;
-int *vector;
+ip *vector;
 
 
 void backup_shutdown(){
@@ -82,17 +82,17 @@ void backup_start(){
 }
 
 void dump_to_module(){
-    char data[BUF_SIZE];
-    dump_data(data);
-    ioctl_func(data);
+    // char data[BUF_SIZE];
+    // dump_data(data);
+    ioctl_func();
 }
 
 /* Functions for the ioctl calls */ 
-int ioctl_set_msg(int file_desc, char *message)
+int ioctl_set_msg(int file_desc)
 {
     int ret_val;
  
-    ret_val = ioctl(file_desc, IOCTL_SET_MSG, message);
+    ret_val = ioctl(file_desc, IOCTL_SET_MSG, vector);
  
     if (ret_val < 0) {
         printf("ioctl_set_msg failed:%d\n", ret_val); 
@@ -101,7 +101,7 @@ int ioctl_set_msg(int file_desc, char *message)
     return ret_val;
 }
 
-int ioctl_func(char* data){
+int ioctl_func(){
 	
     int file_desc, ret_val;
     
@@ -112,7 +112,7 @@ int ioctl_func(char* data){
         log_error("Can't open device file: %s, error:%d\n", DEVICE_PATH, file_desc);
         exit(EXIT_FAILURE);
     }
-    ret_val = ioctl_set_msg(file_desc, data);
+    ret_val = ioctl_set_msg(file_desc);
     if (ret_val){
         log_error("ioctl_set_msg failed:%d\n", ret_val);
         close(file_desc);
@@ -124,17 +124,17 @@ int ioctl_func(char* data){
 
 }
 
-char* dump_data(char* data){
-    char tmpbuf[128];
-    snprintf(data, BUF_SIZE, "%d,", vector_get_size(vector));
-    for(int i = 0; i < vector_get_size(vector); i++){
-        ip *tmpip = vector_at(vector, i);
-        snprintf(tmpbuf, BUF_SIZE, "%s,%d,%s,", tmpip->address, tmpip->port, tmpip->protocol);
-        strcat(data, tmpbuf);
-    }
+// char* dump_data(char* data){
+//     char tmpbuf[128];
+//     snprintf(data, BUF_SIZE, "%d,", vector_get_size(vector));
+//     for(int i = 0; i < vector_get_size(vector); i++){
+//         ip *tmpip = vector_at(vector, i);
+//         snprintf(tmpbuf, BUF_SIZE, "%s,%d,%s,", tmpip->address, tmpip->port, tmpip->protocol);
+//         strcat(data, tmpbuf);
+//     }
 
-    return data;
-}
+//     return data;
+// }
 
 static void skeleton_daemon(){
     pid_t pid; /* Used pid_t for portability */

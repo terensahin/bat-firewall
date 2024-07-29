@@ -17,7 +17,7 @@
 #define MAJOR_NUM 100 
  
 /* Set the message of the device driver */ 
-#define IOCTL_SET_MSG _IOW(MAJOR_NUM, 0, char *) 
+#define IOCTL_SET_MSG _IOW(MAJOR_NUM, 0, ip *) 
 /* _IOW means that we are creating an ioctl command number for passing 
  * information from a user process to the kernel module. 
  * 
