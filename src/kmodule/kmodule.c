@@ -165,14 +165,14 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 
         if (isBlocked(ntohs(tcp_header->dest), src_ip_address, "tcp") == 1){
             pr_info("tcp dropped\n"); 
-            return NF_ACCEPT;
+            return NF_DROP;
         } 
     }else if (ip_header->protocol == IPPROTO_UDP) {
         pr_info("UDP packet detected!\n");
 	    udp_header = udp_hdr(skb);
         if (isBlocked(ntohs(udp_header->dest), src_ip_address, "udp") == 1){
             pr_info("udp dropped\n");
-            return NF_ACCEPT;
+            return NF_DROP;
         }
 	}
     
