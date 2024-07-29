@@ -16,9 +16,9 @@
 #include <linux/udp.h>
 #include <linux/string.h>
 #include <linux/inet.h>
-#include "../common.h"
 #include <asm/errno.h> 
-#include "chardev.h" 
+#include "../common.h"
+#include "../chardev.h" 
 
 #define SUCCESS 0 
 #define DEVICE_NAME "char_dev" 

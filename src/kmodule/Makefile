@@ -1,7 +1,7 @@
-obj-m += ioctl.o
+obj-m += kmodule.o
 
 DIREC = $(shell pwd)
-OBJS = ioctl.ko ioctl.mod ioctl.mod.c ioctl.mod.o ioctl.o modules.order Module.symvers
+OBJS = kmodule.ko kmodule.mod kmodule.mod.c kmodule.mod.o kmodule.o modules.order Module.symvers
 TARGETDIR = ../../build/kbuild
 
 all:
