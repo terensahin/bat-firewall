@@ -16,14 +16,18 @@ void help_usage(){
     printf("Usage: cli [OPTIONS] [ARGUMENTS]\n");
     printf("OPTIONS:\n");
     printf("\t-a: Add \n");
-    printf("\t-d: Delete with ID\n");
-    printf("\t-s: Search\n");
+    printf("\t-d: Delete with index\n");
+    printf("\t-s: Show all\n");
+    printf("\t-t: Terminate daemon\n");
+    printf("\t-c: Change the log level\n");
     printf("ARGUMENTS:\n");
     printf("\t[ARGUMENTS]: Arguments to be sent to the server\n");
     printf("EXAMPLE USAGE:\n");
-    printf("\tcli -a \"george 2521 3.75\"\n");
-    printf("\tcli -d 2521\n");
+    printf("\tcli -a \"192.128.55.48 5005 tcp\"\n");
+    printf("\tcli -d 4\n");
     printf("\tcli -s\n");
+    printf("\tcli -t\n");
+    printf("\tcli -c [0-5]\n");
     exit(0);
 }
 
@@ -70,7 +74,7 @@ void wait_response(int socket_fd, struct sockaddr_un claddr){
         exit(EXIT_FAILURE);
     printf("%.*s",(int) read_bytes, resp);
 
-    remove(claddr.sun_path);            /* Remove client socket pathname */
+    remove(claddr.sun_path);   /* Remove client socket pathname */
     return;
 }
 
@@ -82,6 +86,7 @@ int main(int argc, char *argv[])
     daemon_command command;
 
     int opt;
+    /* Create the command and proper rule according to command line arguments */
     while ((opt = getopt(argc, argv, "a:d:shtl:")) != -1) {
         switch (opt) {
             case 'h':

@@ -23,7 +23,7 @@
 FILE *logfp;
 firewall_rule *vector;
 
-
+/* Create or set the backup file when shutdown happens */
 void backup_shutdown(){
     log_trace("shotdown back up started");
     FILE *file = fopen(BACKUP_FILE, "w");
@@ -40,14 +40,7 @@ void backup_shutdown(){
     fclose(logfp);
 }
 
-void sigterm_handler(int sig){
-    backup_shutdown();
-    exit(EXIT_FAILURE);
-}
-
-/*  
-    Read the backup file and fill the vector
-*/
+/* Read the backup file and fill the vector */
 void backup_start(){
     FILE *file = fopen(BACKUP_FILE, "a+");
     if (file == NULL) {
@@ -73,7 +66,6 @@ void backup_start(){
         vector = vector_push_back(vector, &tmprule);
     }
 
-
     ioctl_func();
 
     fclose(file);
@@ -81,22 +73,30 @@ void backup_start(){
     return;
 }
 
-/* Functions for the ioctl calls */ 
-int ioctl_set_msg(int file_desc)
-{
+/* Function for the ioctl call */ 
+int ioctl_set_msg(int file_desc){
     int ret_val;
  
-    ret_val = ioctl(file_desc, IOCTL_SET_MSG, vector);
+    int vector_size = vector_get_size(vector);
+
+    ret_val = ioctl(file_desc, IOCTL_SET_SIZE, &vector_size);
+
+    if (ret_val < 0) {
+        printf("ioctl_set_msg failed 1:%d\n", ret_val); 
+    }
+
+    ret_val = ioctl(file_desc, IOCTL_SET_RULE, vector);
  
     if (ret_val < 0) {
-        printf("ioctl_set_msg failed:%d\n", ret_val); 
+        printf("ioctl_set_msg failed 2:%d\n", ret_val); 
     }
  
     return ret_val;
 }
 
+/* Function that opens our module device, communicates with ioctl, then closes the device */
+/* All rules are dumped to kernel module */
 int ioctl_func(){
-	
     int file_desc, ret_val;
     
     log_trace("Sending data to the kernel");
@@ -116,6 +116,24 @@ int ioctl_func(){
     close(file_desc);
     return 0; 
 
+}
+
+/* Handler function for shutdown */
+void shutdown_handler(int sig){
+    backup_shutdown();
+    exit(EXIT_FAILURE);
+}
+
+/* Set handlers for a SIGNAL */
+void setup_signal_handler(int signal, void (*handler)(int)) {
+    struct sigaction sa;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESTART;
+    sa.sa_handler = handler;
+    if (sigaction(signal, &sa, NULL) == -1) {
+        perror("error sigaction");
+        exit(EXIT_FAILURE);
+    }
 }
 
 static void skeleton_daemon(){
@@ -138,26 +156,11 @@ static void skeleton_daemon(){
         exit(EXIT_FAILURE);
     } 
 
-    struct sigaction sa; /* Ignore SIGCHLD and SIGHUP signals */
-    sigemptyset(&sa.sa_mask);
-    sa.sa_flags = SA_RESTART;
-    sa.sa_handler = SIG_IGN;
-    if (sigaction(SIGHUP, &sa, NULL) == -1) {
-        log_error("error sigaction 1");
-        exit(EXIT_FAILURE);
-    }
-    if (sigaction(SIGCHLD, &sa, NULL) == -1) {
-        log_error("error sigaction 2");
-        exit(EXIT_FAILURE);
-    }
-
-    sigemptyset(&sa.sa_mask); /* Set handler for SIGTERM signal (backup on shutdown) */
-    sa.sa_flags = SA_RESTART;
-    sa.sa_handler = sigterm_handler;
-    if (sigaction(SIGTERM, &sa, NULL) == -1) {
-        log_error("error sigaction 3");
-        exit(EXIT_FAILURE);
-    }
+    setup_signal_handler(SIGHUP, SIG_IGN);
+    setup_signal_handler(SIGCHLD, SIG_IGN);
+    setup_signal_handler(SIGTERM, shutdown_handler);
+    setup_signal_handler(SIGSEGV, shutdown_handler);
+    setup_signal_handler(SIGABRT, shutdown_handler);
 
     pid = fork(); /* This fork is to prevent access to the terminal */
 
@@ -242,20 +245,20 @@ int create_socket(){
 void execute_command(daemon_command command, char* response, ssize_t *command_len){
     switch (command.command_type)
     {
-    case add:
+    case add: /* Add a rule to vector */
         firewall_rule tmprule = command.rule_info;
         vector = vector_push_back(vector, &tmprule);
         snprintf(response, BUF_SIZE, "Successfully added IP: Address: %s, Port: %d, Protocol: %s\n" ,\
             command.rule_info.address, command.rule_info.port, command.rule_info.protocol);
-        ioctl_func();
+        ioctl_func(); /* All rules are dumped to kernel module */
         break;
-    case del:
+    case del: /* Delete a rule from vector with given index */
         int delete_index = command.rule_info.port;
 	    vector_erase(vector, delete_index);
         snprintf(response, BUF_SIZE, "Successfully deleted IP with index %d\n", delete_index);
-        ioctl_func();
+        ioctl_func(); /* All rules are dumped to kernel module */
         break;
-    case show:
+    case show: /* Dump all rules to user terminal */
         snprintf(response, BUF_SIZE, "All IPs:\n" );
         for(int i = 0; i < vector_get_size(vector); i++){
             firewall_rule *tmprule = vector_at(vector, i);
@@ -264,11 +267,11 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
             strcat(response, tmpbuf);
         }
         break;
-    case terminate:
+    case terminate: /* Terminate the deamon */
         snprintf(response, BUF_SIZE, "Terminating daemon\n" );
         backup_shutdown();
         break;
-    case chlog:
+    case chlog: /* Change log levels */
         snprintf(response, BUF_SIZE, "Changed debug log\n" );
         log_set_level(command.log_level);
         break;
@@ -319,14 +322,14 @@ int main()
     char response[BUF_SIZE];
     while (1) {
         log_trace("waiting for command");
-        if (recvfrom(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &claddr, &len) == -1){
+        if (recvfrom(socket_fd, &command, sizeof(daemon_command), 0, (struct sockaddr *) &claddr, &len) == -1){ /* Receive command from cli process */
             log_error("command could not be read properly");
             exit(EXIT_FAILURE);
         }
 
         execute_command(command, response, &command_bytes);
 
-        if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){
+        if (sendto(socket_fd, response, command_bytes, 0, (struct sockaddr *) &claddr, len) != command_bytes){ /* Send response back to cli process */
             log_error("response could not be sent properly");
             exit(EXIT_FAILURE);
         }

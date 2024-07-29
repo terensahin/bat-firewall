@@ -28,17 +28,22 @@ enum {
     CDEV_EXCLUSIVE_OPEN = 1, 
 }; 
 
+/* All rules gotten from daemon */
 firewall_rule firewall_rules[32];
+int rules_size;
  
 /* Is the device open right now? Used to prevent concurrent access into 
  * the same device 
  */ 
 static atomic_t already_open = ATOMIC_INIT(CDEV_NOT_USED); 
  
+ /* Used to initialize the device */
 static struct class *cls; 
 
+/* Used for netlayer hooking */
 static struct nf_hook_ops *nfho = NULL;
  
+
 /* This is called whenever a process attempts to open the device file */ 
 static int device_open(struct inode *inode, struct file *file) 
 { 
@@ -47,7 +52,8 @@ static int device_open(struct inode *inode, struct file *file)
     try_module_get(THIS_MODULE); 
     return SUCCESS; 
 } 
- 
+
+/* This is called whenever a process attempts to close the device file */ 
 static int device_release(struct inode *inode, struct file *file) 
 { 
     pr_info("device_release(%p,%p)\n", inode, file); 
@@ -60,9 +66,6 @@ static int device_release(struct inode *inode, struct file *file)
  * device file. We get two extra parameters (additional to the inode and file 
  * structures, which all device functions get): the number of the ioctl called 
  * and the parameter given to the ioctl function. 
- * 
- * If the ioctl is write or read/write (meaning output is returned to the 
- * calling process), the ioctl call returns the output of this function. 
  */ 
 static long device_ioctl(struct file *file,
              unsigned int ioctl_num, /* command */ 
@@ -70,27 +73,31 @@ static long device_ioctl(struct file *file,
 { 
     long ret = SUCCESS; 
  
-    if (atomic_cmpxchg(&already_open, CDEV_NOT_USED, CDEV_EXCLUSIVE_OPEN)) 
+    if (atomic_cmpxchg(&already_open, CDEV_NOT_USED, CDEV_EXCLUSIVE_OPEN)) /* Locks the function */
         return -EBUSY; 
  
     switch (ioctl_num) { 
-        case IOCTL_SET_MSG: {
+        case IOCTL_SET_RULE:
             firewall_rule __user *user_frule_ptr = (firewall_rule __user *)ioctl_param;
 
             if (copy_from_user(firewall_rules, user_frule_ptr, sizeof(firewall_rules))) {
-                pr_info("error COPY");
+                pr_err("error copying from daemon");
                 return -EFAULT;
             }
 
-            pr_info("%s %d %s", firewall_rules[0].address, firewall_rules[0].port, firewall_rules[0].protocol);
-            pr_info("%s %d %s", firewall_rules[1].address, firewall_rules[1].port, firewall_rules[1].protocol);
-            pr_info("%s %d %s", firewall_rules[2].address, firewall_rules[2].port, firewall_rules[2].protocol);
+            break;
+        case IOCTL_SET_SIZE:
+            int __user *user_size_ptr = (int __user *)ioctl_param;
+
+            if (copy_from_user(&rules_size, user_size_ptr, sizeof(int))) {
+                pr_err("error copying the size");
+                return -EFAULT;
+            }
 
             break;
-        }
     } 
  
-    atomic_set(&already_open, CDEV_NOT_USED); 
+    atomic_set(&already_open, CDEV_NOT_USED); /* Release the lock */
  
     return ret; 
 } 
@@ -102,18 +109,18 @@ static struct file_operations fops = {
     .release = device_release,
 }; 
 
-
+/* Check whether the hooked packet will be blocked */
 static int isBlocked(int port, uint32_t address, char* protocol){
 
     uint8_t tmp_addr[4];
     uint32_t addr;
 
-    for(int i = 0; i < 8; i++){
+    for(int i = 0; i < (rules_size < 32 ? rules_size : 32); i++){
 
         pr_info("check firewall_rule: %s\n", firewall_rules[i].address);
 
         if(in4_pton(firewall_rules[i].address, -1, tmp_addr, -1, NULL) <= 0){
-            pr_info("INT4 PTON ERROR\n");
+            pr_err("INT4 PTON ERROR\n");
             continue;
         }
 
@@ -137,6 +144,7 @@ static int isBlocked(int port, uint32_t address, char* protocol){
     return 0;
 }
 
+/* Hook function */
 static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_state *state)
 {
     struct iphdr *ip_header;
@@ -152,24 +160,20 @@ static unsigned int hfunc(void *priv, struct sk_buff *skb, const struct nf_hook_
 
     pr_info("SOURCE IP ADDRESS %d\n", src_ip_address); 
     if (ip_header->protocol == IPPROTO_TCP) {
-
-        printk(KERN_INFO "TCP packet detected!\n");
+        pr_info("TCP packet detected!\n");
         tcp_header = (struct tcphdr *) skb_transport_header(skb);
 
         if (isBlocked(ntohs(tcp_header->dest), src_ip_address, "tcp") == 1){
             pr_info("tcp dropped\n"); 
             return NF_ACCEPT;
         } 
-
     }else if (ip_header->protocol == IPPROTO_UDP) {
-        printk(KERN_INFO "UDP packet detected!\n");
-        
+        pr_info("UDP packet detected!\n");
 	    udp_header = udp_hdr(skb);
         if (isBlocked(ntohs(udp_header->dest), src_ip_address, "udp") == 1){
             pr_info("udp dropped\n");
             return NF_ACCEPT;
         }
-		
 	}
     
     pr_info("packet accepted\n");
@@ -193,7 +197,7 @@ static int __init chardev2_init(void)
         return ret_val; 
     } 
  
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0) 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0) /* For portability */
     cls = class_create(DEVICE_FILE_NAME); 
 #else 
     cls = class_create(THIS_MODULE, DEVICE_FILE_NAME); 
