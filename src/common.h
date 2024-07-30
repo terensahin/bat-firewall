@@ -2,7 +2,7 @@
 #define COMMON_H
 
 typedef struct firewall_rule{
-    char address[100];
+    char address[50];
     int port;
     char protocol[4];
 }firewall_rule;

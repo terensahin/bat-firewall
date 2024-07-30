@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <arpa/inet.h>
 
 firewall_rule create_ip(char* address, int port, char* protocol){
     firewall_rule new_ip;
@@ -19,34 +20,44 @@ daemon_command create_daemon_command(command command_type, char* address, int po
     return new_daemon_command;
 }
 
+int is_valid_ip(const char *ip) {
+    struct sockaddr_in sa;
+    struct sockaddr_in6 sa6;
+    return (inet_pton(AF_INET, ip, &(sa.sin_addr)) != 0);
+}
+
 firewall_rule parse_ip_info(char* input) {
     if (input == NULL) {
         fprintf(stderr, "Error: Input string is NULL\n");
-        return create_ip("", -1, ""); // or an appropriate error value for your use case
+        exit(EXIT_FAILURE);
     }
 
     char *address = strtok(input, " ");
     if (address == NULL) {
         fprintf(stderr, "Error: Failed to parse address\n");
-        return create_ip("", -1, ""); // or an appropriate error value
-    }
+        exit(EXIT_FAILURE);    }
+
+    if (!is_valid_ip(address)) {
+        fprintf(stderr, "Error: Invalid IP address\n");
+        exit(EXIT_FAILURE);    }
 
     char *port_str = strtok(NULL, " ");
     if (port_str == NULL) {
         fprintf(stderr, "Error: Failed to parse port\n");
-        return create_ip("", -1, ""); // or an appropriate error value
-    }
+        exit(EXIT_FAILURE);    }
     int port = atoi(port_str);
-    if (port <= 0) {
+    if (port <= 0 || port > 65535) {
         fprintf(stderr, "Error: Invalid port number\n");
-        return create_ip("", -1, ""); // or an appropriate error value
-    }
+        exit(EXIT_FAILURE);    }
 
     char *protocol = strtok(NULL, " ");
     if (protocol == NULL) {
         fprintf(stderr, "Error: Failed to parse protocol\n");
-        return create_ip("", -1, ""); // or an appropriate error value
-    }
+        exit(EXIT_FAILURE);    }
+
+    if (strcmp(protocol, "TCP") != 0 && strcmp(protocol, "UDP") != 0 && strcmp(protocol, "tcp") != 0 && strcmp(protocol, "udp") != 0) {
+        fprintf(stderr, "Error: Invalid protocol\n");
+        exit(EXIT_FAILURE);    }
 
     return create_ip(address, port, protocol);
 }
