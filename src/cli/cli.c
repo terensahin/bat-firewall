@@ -19,7 +19,7 @@ void help_usage(){
     printf("\t-d: Delete with index\n");
     printf("\t-s: Show all\n");
     printf("\t-t: Terminate daemon\n");
-    printf("\t-c: Change the log level\n");
+    printf("\t-l: Change the log level\n");
     printf("ARGUMENTS:\n");
     printf("\t[ARGUMENTS]: Arguments to be sent to the server\n");
     printf("EXAMPLE USAGE:\n");
@@ -27,7 +27,7 @@ void help_usage(){
     printf("\tcli -d 4\n");
     printf("\tcli -s\n");
     printf("\tcli -t\n");
-    printf("\tcli -c [0-5]\n");
+    printf("\tcli -l [0-5]\n");
     exit(0);
 }
 

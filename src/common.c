@@ -22,7 +22,6 @@ daemon_command create_daemon_command(command command_type, char* address, int po
 
 int is_valid_ip(const char *ip) {
     struct sockaddr_in sa;
-    struct sockaddr_in6 sa6;
     return (inet_pton(AF_INET, ip, &(sa.sin_addr)) != 0);
 }
 
