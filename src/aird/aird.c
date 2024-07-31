@@ -12,7 +12,7 @@
 #include <sys/socket.h>
 #include <errno.h>
 #include <sys/un.h>
-#include <sys/ioctl.h> 
+#include <sys/ioctl.h>
 
 #include "aird.h"
 #include "../c_vector.h"
@@ -73,24 +73,24 @@ void backup_start(){
     return;
 }
 
-/* Function for the ioctl call */ 
+/* Function for the ioctl call */
 int ioctl_set_msg(int file_desc){
     int ret_val;
- 
+
     int vector_size = vector_get_size(vector);
 
     ret_val = ioctl(file_desc, IOCTL_SET_SIZE, &vector_size);
 
     if (ret_val < 0) {
-        printf("ioctl_set_msg failed 1:%d\n", ret_val); 
+        printf("ioctl_set_msg failed 1:%d\n", ret_val);
     }
 
     ret_val = ioctl(file_desc, IOCTL_SET_RULE, vector);
- 
+
     if (ret_val < 0) {
-        printf("ioctl_set_msg failed 2:%d\n", ret_val); 
+        printf("ioctl_set_msg failed 2:%d\n", ret_val);
     }
- 
+
     return ret_val;
 }
 
@@ -98,7 +98,7 @@ int ioctl_set_msg(int file_desc){
 /* All rules are dumped to kernel module */
 int ioctl_func(){
     int file_desc, ret_val;
-    
+
     log_trace("Sending data to the kernel");
 
     file_desc = open(DEVICE_PATH, O_RDWR);
@@ -114,7 +114,7 @@ int ioctl_func(){
     }
 
     close(file_desc);
-    return 0; 
+    return 0;
 
 }
 
@@ -154,7 +154,7 @@ static void skeleton_daemon(){
     if (setsid() < 0){ /* Child process becomes leader of his own session */
         log_error("error creating session");
         exit(EXIT_FAILURE);
-    } 
+    }
 
     setup_signal_handler(SIGHUP, SIG_IGN);
     setup_signal_handler(SIGCHLD, SIG_IGN);
@@ -245,20 +245,23 @@ int create_socket(){
 void execute_command(daemon_command command, char* response, ssize_t *command_len){
     switch (command.command_type)
     {
-    case add: /* Add a rule to vector */
+    case add: { /* Add a rule to vector */
         firewall_rule tmprule = command.rule_info;
         vector = vector_push_back(vector, &tmprule);
         snprintf(response, BUF_SIZE, "Successfully added IP: Address: %s, Port: %d, Protocol: %s\n" ,\
             command.rule_info.address, command.rule_info.port, command.rule_info.protocol);
         ioctl_func(); /* All rules are dumped to kernel module */
         break;
-    case del: /* Delete a rule from vector with given index */
+    }
+
+    case del: { /* Delete a rule from vector with given index */
         int delete_index = command.rule_info.port;
 	    vector_erase(vector, delete_index);
         snprintf(response, BUF_SIZE, "Successfully deleted IP with index %d\n", delete_index);
         ioctl_func(); /* All rules are dumped to kernel module */
         break;
-    case show: /* Dump all rules to user terminal */
+    }
+    case show: { /* Dump all rules to user terminal */
         snprintf(response, BUF_SIZE, "All IPs:\n" );
         for(int i = 0; i < vector_get_size(vector); i++){
             firewall_rule *tmprule = vector_at(vector, i);
@@ -267,17 +270,21 @@ void execute_command(daemon_command command, char* response, ssize_t *command_le
             strcat(response, tmpbuf);
         }
         break;
-    case terminate: /* Terminate the deamon */
+    }
+    case terminate: {/* Terminate the deamon */
         snprintf(response, BUF_SIZE, "Terminating daemon\n" );
         backup_shutdown();
         break;
-    case chlog: /* Change log levels */
+    }
+    case chlog: { /* Change log levels */
         snprintf(response, BUF_SIZE, "Changed debug log\n" );
         log_set_level(command.log_level);
         break;
-    default:
+    }
+    default: {
         snprintf(response, BUF_SIZE, "Unknown command\n" );
         break;
+    }
     }
 
 
@@ -337,7 +344,7 @@ int main()
         if(command.command_type == terminate){
             return EXIT_SUCCESS;
         }
-        
+
         log_trace("response is sent");
     }
     return EXIT_SUCCESS;

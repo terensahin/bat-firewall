@@ -13,6 +13,6 @@ move: $(OBJS)
 	$(CC) $(CFLAGS) -c $<
 
 clean:
-	rm -f $(OBJS) 
+	rm -f $(OBJS)
 
 .PHONY: all clean $(BUILD)
