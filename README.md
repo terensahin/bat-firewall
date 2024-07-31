@@ -105,7 +105,7 @@ Events:
 
 Commands:
 ```sh
-	cli -l [0-5]
+cli -l [0-5]
 ```
 
 Expected Output:
