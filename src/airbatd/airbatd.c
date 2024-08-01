@@ -14,11 +14,11 @@
 #include <sys/un.h>
 #include <sys/ioctl.h>
 
-#include "aird.h"
+#include "airbatd.h"
 #include "../c_vector.h"
 #include "../common.h"
 #include "log.h"
-#include "../chardev.h"
+#include "../batdev.h"
 
 FILE *logfp;
 firewall_rule *vector;

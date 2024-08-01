@@ -32,10 +32,10 @@ Accepted connection from {client ip}, port {client port 1}
 ```
 The server port is the one that we will use in our test. Note this port as well.
 
-#### 1.7 On your server execute **aird** and **cli** processes and add "{client ip} {server port} udp" to the firewall rules using following commands.
+#### 1.7 On your server execute **airbatd** and **cli** processes and add "{client ip} {server port} udp" to the firewall rules using following commands.
 ```sh
-./aird
-./cli -a "{client ip} {server port} udp"
+./airbatd
+./airbat_cli -a "{client ip} {server port} udp"
 ```
 Note that we use UDP because the -u option was specified in the iperf command, making the connection type UDP. To use TCP instead, simply remove the -u option from the client command.
 
@@ -60,8 +60,8 @@ Note that we use UDP because the -u option was specified in the iperf command, m
 
 #### 1.9 Now you can use following commands to see the index of your firewall rule and delete the rule to accept the packets again.
 ```sh
-./cli -s
-./cli -d {rule index}
+./airbat_cli -s
+./airbat_cli -d {rule index}
 ```
 After these commands, the packets should go back to the normal.
 
@@ -85,10 +85,10 @@ sudo hping3 -a [fake_ip] -p [target_port] -2 [target_ip] # Send UDP packets
 ```
 Here you may use "127.0.0.1" as target ip, since it will make your machine the target for packets.
 
-#### 2.3 On your machine execute **aird** and **cli** processes and add "{fake_ip} {target_port} {udp or tcp}" to the firewall rules using following commands.
+#### 2.3 On your machine execute **airbatd** and **cli** processes and add "{fake_ip} {target_port} {udp or tcp}" to the firewall rules using following commands.
 ```sh
-./aird
-./cli -a "{fake_ip} {target_port} {udp or tcp}"
+./airbatd
+./airbat_cli -a "{fake_ip} {target_port} {udp or tcp}"
 ```
 
 #### 2.4 Use `dmesg` command to check kernel logs and you can see whether the packets are accepted or dropped.

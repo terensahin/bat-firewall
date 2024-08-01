@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -c -g -Wall -Wextra
-OBJS = aird.o log.o
+OBJS = airbatd.o log.o
 BUILD = ../../build/
 
 all: move

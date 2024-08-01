@@ -1,9 +1,9 @@
 CC = gcc
 CFLAGS = -g -Wall -Wextra
-DAEMONOBJS = aird.o common.o c_vector.o log.o
-DAEMONTARGET = aird
-CLIOBJS = cli.o common.o
-CLITARGET = cli
+DAEMONOBJS = airbatd.o common.o c_vector.o log.o
+DAEMONTARGET = airbatd
+CLIOBJS = airbat_cli.o common.o
+CLITARGET = airbat_cli
 
 .PHONY: all clean
 

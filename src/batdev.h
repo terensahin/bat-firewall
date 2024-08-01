@@ -2,7 +2,7 @@
  * chardev.h - the header file with the ioctl definitions.
  *
  * The declarations here have to be in a header file, because they need
- * to be known both to the kernel module (in chardev2.c) and the process
+ * to be known both to the kernel module and the process
  * calling ioctl() (in userspace_ioctl.c).
  */
 
@@ -33,7 +33,7 @@
 #define IOCTL_SET_SIZE _IOW(MAJOR_NUM, 1, int *)
 
 /* The name of the device file */
-#define DEVICE_FILE_NAME "char_dev"
-#define DEVICE_PATH "/dev/char_dev"
+#define DEVICE_FILE_NAME "bat_dev"
+#define DEVICE_PATH "/dev/bat_dev"
 
 #endif

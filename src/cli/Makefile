@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -c -g -Wall -Wextra
-OBJS = cli.o
+OBJS = airbat_cli.o
 BUILD = ../../build/
 
 

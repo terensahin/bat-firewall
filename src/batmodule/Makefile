@@ -1,7 +1,7 @@
-obj-m += kmodule.o
+obj-m += batmodule.o
 
 DIREC = $(shell pwd)
-OBJS = kmodule.ko kmodule.mod kmodule.mod.c kmodule.mod.o kmodule.o modules.order Module.symvers
+OBJS = batmodule.ko batmodule.mod batmodule.mod.c batmodule.mod.o batmodule.o modules.order Module.symvers
 TARGETDIR = ../../build/kbuild
 
 all:

@@ -18,7 +18,7 @@
 #include <linux/inet.h>
 #include <asm/errno.h>
 #include "../common.h"
-#include "../chardev.h"
+#include "../batdev.h"
 
 #define SUCCESS 0
 #define DEVICE_NAME "char_dev"
@@ -80,7 +80,7 @@ static long device_ioctl(struct file *file,
         case IOCTL_SET_RULE: {
             firewall_rule __user *user_frule_ptr = (firewall_rule __user *)ioctl_param;
 
-            if (copy_from_user(firewall_rules, user_frule_ptr, sizeof(firewall_rules))) {
+            if (copy_from_user(firewall_rules, user_frule_ptr, sizeof(firewall_rule) * rules_size)) {
                 pr_err("error copying from daemon");
                 return -EFAULT;
             }

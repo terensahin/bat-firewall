@@ -24,8 +24,8 @@ The project integrates a daemon, CLI, and kernel module into a single embedded L
 ## Build 
 ```sh
 make
-cd build/kbuild && sudo insmod kmodule.ko && cd ..
-sudo ./aird
+cd build/kbuild && sudo insmod batmodule.ko && cd ..
+sudo ./airbatd
 ```
 
 
@@ -37,7 +37,7 @@ sudo ./aird
 
 Commands:
 ```sh
-cli -a "192.168.100.11 5005 tcp"
+airbat_cli -a "192.168.100.11 5005 tcp"
 ```
 
 Expected Output:
@@ -57,7 +57,7 @@ Events:
 
 Commands:
 ```sh
-cli -s
+airbat_cli -s
 ```
 
 Expected Output:
@@ -70,7 +70,7 @@ Expected Output:
 
 Commands:
 ```sh
-cli -d [index]
+airbat_cli -d [index]
 ```
 
 Expected Output:
@@ -88,7 +88,7 @@ Events:
 
 Commands:
 ```sh
-cli -t
+airbat_cli -t
 ```
 
 Expected Output:
@@ -105,7 +105,7 @@ Events:
 
 Commands:
 ```sh
-cli -l [0-5]
+airbat_cli -l [0-5]
 ```
 
 Expected Output:
