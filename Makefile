@@ -1,7 +1,7 @@
 CC = gcc
 
 TARGETS = aird cli
-SUBDIRS = src src/airbatd src/cli src/batmodule build
+SUBDIRS = src src/daemon src/cli src/module build
 
 .PHONY: all clean $(SUBDIRS)
 
