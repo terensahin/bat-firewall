@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -Wall
+CFLAGS = -g -Wall -Wextra
 DAEMONOBJS = aird.o common.o c_vector.o log.o
 DAEMONTARGET = aird
 CLIOBJS = cli.o common.o

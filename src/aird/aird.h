@@ -17,7 +17,7 @@ int ioctl_func();
 char* dump_data(char* data);
 void dump_to_module();
 void backup_shutdown();
-void shutdown_handler(int sig);
+void shutdown_handler();
 void backup_start();
 static void skeleton_daemon();
 int create_socket();

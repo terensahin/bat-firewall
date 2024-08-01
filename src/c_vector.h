@@ -14,7 +14,7 @@ typedef struct vector_metadata{
     void (*elem_destructor_func)(void *);
 } vector_metadata;
 
-void* vector_initialize(void *vec, size_t element_size, void (*destuctor_function)(void *));
+void* vector_initialize(size_t element_size, void (*destuctor_function)(void *));
 void* vector_meta_to_vec(vector_metadata *metadata);
 vector_metadata* vector_get_metadata(void *vec);
 int vector_get_size(void *vec);

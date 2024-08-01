@@ -119,7 +119,7 @@ int ioctl_func(){
 }
 
 /* Handler function for shutdown */
-void shutdown_handler(int sig){
+void shutdown_handler(){
     backup_shutdown();
     exit(EXIT_FAILURE);
 }
@@ -316,7 +316,7 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    vector = vector_initialize(vector, sizeof(firewall_rule), NULL);
+    vector = vector_initialize(sizeof(firewall_rule), NULL);
     log_trace("Vector is initialized");
     backup_start();
 

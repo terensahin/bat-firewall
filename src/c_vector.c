@@ -1,6 +1,6 @@
 #include "c_vector.h"
 
-void *vector_initialize(void *vec, size_t element_size, void (*destuctor_function)(void *))
+void *vector_initialize(size_t element_size, void (*destuctor_function)(void *))
 {
     vector_metadata *metadata = (vector_metadata *)malloc(sizeof(vector_metadata));
     metadata->capacity = 0;

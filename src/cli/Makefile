@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -c -g -Wall
+CFLAGS = -c -g -Wall -Wextra
 OBJS = cli.o
 BUILD = ../../build/
 

@@ -41,7 +41,7 @@ static atomic_t already_open = ATOMIC_INIT(CDEV_NOT_USED);
 static struct class *cls;
 
 /* Used for netlayer hooking */
-static struct nf_hook_ops *nfho = NULL;
+static struct nf_hook_ops nfho;
 
 
 /* This is called whenever a process attempts to open the device file */
@@ -207,16 +207,17 @@ static int __init chardev2_init(void)
 
     pr_info("Device created on /dev/%s\n", DEVICE_FILE_NAME);
 
-    static struct nf_hook_ops nfho;
-
     /* Initialize netfilter hook */
     nfho.hook  = (nf_hookfn*)hfunc;        /* hook function */
     nfho.hooknum   = NF_INET_PRE_ROUTING;      /* received packets */
     nfho.pf    = PF_INET;          /* IPv4 */
     nfho.priority  = NF_IP_PRI_FIRST;      /* max hook priority */
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,13,0) /* For portability */
     nf_register_net_hook(&init_net, &nfho);
-
+#else
+    nf_register_hook(&nfho);
+#endif
 
     return 0;
 }
@@ -230,8 +231,11 @@ static void __exit chardev2_exit(void)
     /* Unregister the device */
     unregister_chrdev(MAJOR_NUM, DEVICE_NAME);
 
-    nf_unregister_net_hook(&init_net, nfho);
-    kfree(nfho);
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,13,0) /* For portability */
+    nf_unregister_net_hook(&init_net, &nfho);
+#else
+    nf_unregister_hook(&nfho);
+#endif
 }
 
 module_init(chardev2_init);
